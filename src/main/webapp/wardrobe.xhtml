@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+      xmlns:c="http://xmlns.jcp.org/jsp/jstl/core">
+
+<ui:composition template="/templates/layout.xhtml">
+    <ui:define name="title">My Wardrobe</ui:define>
+    <ui:define name="content">
+
+        <h:form id="wardrobeForm">
+            <div class="page-header">
+                <h2 class="page-title">My Wardrobe</h2>
+                <div class="page-header-actions">
+                    <h:link outcome="/bulk-add" styleClass="btn btn-outline">
+                        <i class="pi pi-images"></i> Bulk add
+                    </h:link>
+                    <p:commandButton value="Add Item" icon="pi pi-plus"
+                                   styleClass="btn btn-primary"
+                                   oncomplete="PF('addItemDlg').show()"
+                                   update=":addItemForm" />
+                </div>
+            </div>
+
+            <!-- Wash Alert Banner -->
+            <p:panel rendered="#{wardrobeBean.washAlertCount gt 0}" styleClass="wash-alert-banner">
+                <h3>
+                    <i class="pi pi-exclamation-triangle"></i> Wash Alerts (#{wardrobeBean.washAlertCount})
+                    <h:link outcome="/laundry" styleClass="btn btn-sm btn-outline wash-alert-link">
+                        Open laundry basket
+                    </h:link>
+                </h3>
+                <div class="wash-alert-items">
+                    <ui:repeat value="#{wardrobeBean.washAlerts}" var="alertItem">
+                        <div class="wash-alert-item">
+                            <span class="wash-item-name">#{alertItem.name}</span>
+                            <span class="wash-item-category badge badge-category">#{alertItem.category}</span>
+                            <p:commandButton value="Mark Washed" icon="pi pi-check"
+                                           styleClass="btn btn-sm btn-success"
+                                           action="#{wardrobeBean.markWashedItem(alertItem)}"
+                                           update="@form" />
+                        </div>
+                    </ui:repeat>
+                </div>
+            </p:panel>
+
+            <!-- Filters Toolbar -->
+            <div class="filters-toolbar">
+                <div class="filter-group">
+                    <p:selectOneMenu value="#{wardrobeBean.selectedCategory}"
+                                   styleClass="filter-select">
+                        <f:selectItem itemLabel="All Categories" itemValue="" />
+                        <f:selectItems value="#{wardrobeBean.categories}" />
+                    </p:selectOneMenu>
+                    <p:commandButton value="Filter" icon="pi pi-filter"
+                                   action="#{wardrobeBean.filterByCategory()}"
+                                   update="@form" styleClass="btn btn-outline btn-sm" />
+                </div>
+
+                <div class="filter-group">
+                    <p:inputText value="#{wardrobeBean.searchTerm}"
+                               placeholder="Search items..." styleClass="filter-input" />
+                    <p:commandButton icon="pi pi-search"
+                                   action="#{wardrobeBean.search()}"
+                                   update="@form" styleClass="btn btn-outline btn-sm" />
+                </div>
+
+                <p:commandButton value="Clear" icon="pi pi-times"
+                               action="#{wardrobeBean.clearFilters()}"
+                               update="@form" styleClass="btn btn-outline btn-sm" />
+            </div>
+
+            <!-- Clothing Items Grid -->
+            <div class="items-grid">
+                <ui:repeat value="#{wardrobeBean.clothingItems}" var="item">
+                    <div class="card item-card">
+                        <div class="card-image-wrapper">
+                            <p:graphicImage value="#{imageStreamer.thumbnail}" styleClass="card-image"
+                                          rendered="#{item.imageData != null}">
+                                <f:param name="itemId" value="#{item.id}" />
+                            </p:graphicImage>
+                            <ui:fragment rendered="#{item.imageData == null}">
+                                <div class="card-image-placeholder">
+                                    <i class="pi pi-image"></i>
+                                </div>
+                            </ui:fragment>
+                            <span class="badge badge-wash" rendered="#{item.needsWash}">
+                                Needs Wash
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <h3 class="card-title">#{item.name}</h3>
+                            <div class="card-meta">
+                                <span class="badge badge-category">#{item.category}</span>
+                                <span class="badge badge-color" rendered="#{not empty item.color}">#{item.color}</span>
+                            </div>
+                            <div class="card-stats">
+                                <span class="wear-count">
+                                    <i class="pi pi-refresh"></i> Worn #{item.wearCount}x
+                                </span>
+                            </div>
+                            <div class="card-tags" rendered="#{not empty item.tags}">
+                                <ui:repeat value="#{item.tags.toArray()}" var="tag">
+                                    <span class="tag-chip">#{tag.name}</span>
+                                </ui:repeat>
+                            </div>
+                            <div class="card-actions">
+                                <h:link outcome="/clothing-detail" styleClass="btn btn-sm btn-outline">
+                                    <f:param name="id" value="#{item.id}" />
+                                    <i class="pi pi-eye"></i> View
+                                </h:link>
+                                <p:commandButton icon="pi pi-refresh" title="Record Wear"
+                                               styleClass="btn btn-sm btn-outline"
+                                               action="#{wardrobeBean.recordWearItem(item)}"
+                                               update="@form :growl" />
+                            </div>
+                        </div>
+                    </div>
+                </ui:repeat>
+            </div>
+
+            <!-- Empty State -->
+            <ui:fragment rendered="#{empty wardrobeBean.clothingItems}">
+                <div class="empty-state">
+                    <i class="pi pi-inbox empty-icon"></i>
+                    <h3>No clothing items yet</h3>
+                    <p>Start building your wardrobe by adding your first item!</p>
+                    <h:link outcome="/bulk-add" styleClass="btn btn-primary">Add several at once</h:link>
+                </div>
+            </ui:fragment>
+
+            <!-- Retired items, hidden until asked for -->
+            <div class="retired-section">
+                <ui:fragment rendered="#{!wardrobeBean.showingRetired}">
+                    <p:commandButton value="Show retired items" icon="pi pi-history"
+                                   action="#{wardrobeBean.loadRetired()}"
+                                   update="@form" process="@this"
+                                   styleClass="btn btn-outline btn-sm" />
+                </ui:fragment>
+
+                <ui:fragment rendered="#{wardrobeBean.showingRetired}">
+                    <div class="retired-header">
+                        <h3>
+                            <i class="pi pi-history"></i>
+                            Retired items (#{wardrobeBean.retiredCount})
+                        </h3>
+                        <p:commandButton value="Hide" icon="pi pi-times"
+                                       action="#{wardrobeBean.hideRetired()}"
+                                       update="@form" process="@this"
+                                       styleClass="btn btn-outline btn-sm" />
+                    </div>
+                    <p class="retired-note">
+                        Out of rotation, but their wear history and cost per wear are kept.
+                    </p>
+
+                    <ui:fragment rendered="#{empty wardrobeBean.retiredItems}">
+                        <p class="retired-empty">Nothing retired yet.</p>
+                    </ui:fragment>
+
+                    <div class="retired-list">
+                        <ui:repeat value="#{wardrobeBean.retiredItems}" var="ri">
+                            <div class="retired-row">
+                                <div class="retired-info">
+                                    <h:link outcome="/clothing-detail" styleClass="retired-name">
+                                        <f:param name="id" value="#{ri.id}" />
+                                        #{ri.name}
+                                    </h:link>
+                                    <span class="badge badge-retired">#{ri.status.displayName}</span>
+                                    <span class="retired-meta">
+                                        worn #{ri.wearCount}&#215;
+                                        <ui:fragment rendered="#{ri.retiredOn != null}">
+                                            &#183; since #{ri.retiredOn}
+                                        </ui:fragment>
+                                    </span>
+                                </div>
+                                <p:commandButton value="Restore" icon="pi pi-undo"
+                                               action="#{wardrobeBean.reactivate(ri)}"
+                                               update="@form :growl"
+                                               styleClass="btn btn-sm btn-outline" />
+                            </div>
+                        </ui:repeat>
+                    </div>
+                </ui:fragment>
+            </div>
+        </h:form>
+
+        <!-- Add Item Dialog -->
+        <p:dialog header="Add Clothing Item" widgetVar="addItemDlg"
+                modal="true" responsive="true" width="500" closable="true">
+            <h:form id="addItemForm" enctype="multipart/form-data">
+                <div class="dialog-form">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <p:inputText value="#{wardrobeBean.newItem.name}" required="true"
+                                   requiredMessage="Name is required"
+                                   placeholder="Item name" styleClass="form-input" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description</label>
+                        <p:inputTextarea value="#{wardrobeBean.newItem.description}"
+                                       rows="3" placeholder="Describe the item"
+                                       styleClass="form-input" />
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>Category</label>
+                            <p:selectOneMenu value="#{wardrobeBean.newItem.category}"
+                                           styleClass="form-input">
+                                <f:selectItem itemLabel="Select category" itemValue="" />
+                                <f:selectItems value="#{wardrobeBean.categories}" />
+                            </p:selectOneMenu>
+                        </div>
+                        <div class="form-group half">
+                            <label>Color</label>
+                            <p:inputText value="#{wardrobeBean.newItem.color}"
+                                       placeholder="e.g. Blue" styleClass="form-input" />
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>Brand</label>
+                            <p:inputText value="#{wardrobeBean.newItem.brand}"
+                                       placeholder="Brand name" styleClass="form-input" />
+                        </div>
+                        <div class="form-group half">
+                            <label>Size</label>
+                            <p:inputText value="#{wardrobeBean.newItem.size}"
+                                       placeholder="e.g. M, 32" styleClass="form-input" />
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>Purchase Price</label>
+                            <p:inputNumber value="#{wardrobeBean.newItem.purchasePrice}"
+                                         decimalPlaces="2" minValue="0"
+                                         placeholder="0.00" styleClass="form-input" />
+                            <small class="form-hint">Optional &#8212; enables cost per wear</small>
+                        </div>
+                        <div class="form-group half">
+                            <label>Purchase Date</label>
+                            <p:datePicker value="#{wardrobeBean.newItem.purchaseDate}"
+                                        pattern="yyyy-MM-dd" showIcon="true"
+                                        styleClass="form-input" />
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Wash After (wears)</label>
+                        <p:spinner value="#{wardrobeBean.newItem.washAfterWears}"
+                                 min="1" max="50" styleClass="form-input" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Image</label>
+                        <p:fileUpload value="#{wardrobeBean.uploadedFile}"
+                                    mode="simple" skinSimple="true"
+                                    allowTypes="/(\.|\/)(gif|jpe?g|png|webp)$/i"
+                                    styleClass="form-input" />
+                    </div>
+
+                    <div class="form-actions">
+                        <p:commandButton value="Save" icon="pi pi-check"
+                                       action="#{wardrobeBean.saveNewItem()}"
+                                       update=":wardrobeForm :growl"
+                                       oncomplete="if(!args.validationFailed) PF('addItemDlg').hide()"
+                                       styleClass="btn btn-primary" />
+                        <p:commandButton value="Cancel" icon="pi pi-times"
+                                       onclick="PF('addItemDlg').hide()"
+                                       type="button" styleClass="btn btn-outline" />
+                    </div>
+                </div>
+            </h:form>
+        </p:dialog>
+
+    </ui:define>
+</ui:composition>
+</html>

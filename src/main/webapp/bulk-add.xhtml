@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+
+<ui:composition template="/templates/layout.xhtml">
+    <ui:define name="title">Add Items in Bulk</ui:define>
+    <ui:define name="content">
+
+        <div class="page-header">
+            <div>
+                <h2 class="page-title">Add Items in Bulk</h2>
+                <p class="page-subtitle">
+                    Drop in every photo at once, then fill in the details in one pass
+                </p>
+            </div>
+            <h:link outcome="/wardrobe" styleClass="btn btn-outline btn-sm">
+                <i class="pi pi-arrow-left"></i> Back to Wardrobe
+            </h:link>
+        </div>
+
+        <!-- Upload -->
+        <h:form id="uploadForm" enctype="multipart/form-data">
+            <div class="card bulk-upload-card">
+                <div class="bulk-upload-copy">
+                    <h3><i class="pi pi-images"></i> 1. Add photos</h3>
+                    <p>
+                        Select as many as you like &#8212; each becomes a draft row below, with
+                        its name guessed from the filename. Nothing is saved until you press
+                        <strong>Save all</strong>.
+                    </p>
+                </div>
+                <p:fileUpload listener="#{bulkAddBean.handleUpload}"
+                              mode="advanced" multiple="true" auto="true"
+                              dragDropSupport="true"
+                              label="Choose photos"
+                              allowTypes="/(\.|\/)(gif|jpe?g|png|webp)$/i"
+                              sizeLimit="20000000"
+                              update=":draftsForm :uploadForm :growl"
+                              styleClass="bulk-uploader" />
+                <p class="bulk-limit-note">
+                    #{bulkAddBean.draftCount} of #{bulkAddBean.maxDrafts} draft slots used.
+                </p>
+            </div>
+        </h:form>
+
+        <h:form id="draftsForm">
+
+            <!-- Apply to all -->
+            <ui:fragment rendered="#{bulkAddBean.hasDrafts}">
+                <div class="card bulk-applyall">
+                    <h3><i class="pi pi-bolt"></i> 2. Set what they share</h3>
+                    <p class="bulk-applyall-note">
+                        Cataloguing a drawer of shirts? Set it once here and apply to every draft.
+                    </p>
+                    <div class="bulk-applyall-row">
+                        <div class="form-group">
+                            <label>Category</label>
+                            <p:selectOneMenu value="#{bulkAddBean.bulkCategory}" styleClass="form-input">
+                                <f:selectItem itemLabel="No change" itemValue="" />
+                                <f:selectItems value="#{bulkAddBean.categories}" />
+                            </p:selectOneMenu>
+                        </div>
+                        <div class="form-group">
+                            <label>Brand</label>
+                            <p:inputText value="#{bulkAddBean.bulkBrand}" placeholder="No change"
+                                         styleClass="form-input" />
+                        </div>
+                        <div class="form-group">
+                            <label>Wash after</label>
+                            <p:spinner value="#{bulkAddBean.bulkWashAfterWears}" min="1" max="50"
+                                       styleClass="form-input" />
+                        </div>
+                        <p:commandButton value="Apply to all" icon="pi pi-check"
+                                         action="#{bulkAddBean.applyToAll()}"
+                                         update="draftsForm :growl"
+                                         styleClass="btn btn-outline" />
+                    </div>
+                </div>
+
+                <!-- Draft table -->
+                <div class="card bulk-drafts">
+                    <h3><i class="pi pi-list"></i> 3. Fill in the details</h3>
+                    <div class="tablewrap">
+                        <p:dataTable value="#{bulkAddBean.drafts}" var="draft"
+                                     styleClass="bulk-table" rowIndexVar="rowIdx">
+                            <p:column headerText="Photo" styleClass="bulk-col-photo">
+                                <h:graphicImage value="#{draft.previewDataUri}" styleClass="bulk-thumb"
+                                                alt="#{draft.fileName}" />
+                            </p:column>
+                            <p:column headerText="Name" styleClass="bulk-col-name">
+                                <p:inputText value="#{draft.name}" required="true"
+                                             requiredMessage="Every item needs a name"
+                                             styleClass="form-input" />
+                            </p:column>
+                            <p:column headerText="Category">
+                                <p:selectOneMenu value="#{draft.category}" styleClass="form-input">
+                                    <f:selectItem itemLabel="—" itemValue="" />
+                                    <f:selectItems value="#{bulkAddBean.categories}" />
+                                </p:selectOneMenu>
+                            </p:column>
+                            <p:column headerText="Colour">
+                                <p:inputText value="#{draft.color}" placeholder="e.g. navy"
+                                             styleClass="form-input bulk-narrow" />
+                            </p:column>
+                            <p:column headerText="Brand">
+                                <p:inputText value="#{draft.brand}" styleClass="form-input bulk-narrow" />
+                            </p:column>
+                            <p:column headerText="Size">
+                                <p:inputText value="#{draft.size}" styleClass="form-input bulk-tiny" />
+                            </p:column>
+                            <p:column headerText="Wash after">
+                                <p:spinner value="#{draft.washAfterWears}" min="1" max="50"
+                                           styleClass="form-input bulk-tiny" />
+                            </p:column>
+                            <p:column headerText="Price">
+                                <p:inputNumber value="#{draft.purchasePrice}" decimalPlaces="2"
+                                               minValue="0" placeholder="0.00"
+                                               styleClass="form-input bulk-narrow" />
+                            </p:column>
+                            <p:column styleClass="bulk-col-remove">
+                                <p:commandButton icon="pi pi-times" title="Remove this draft"
+                                                 action="#{bulkAddBean.removeDraft(draft.id)}"
+                                                 update="draftsForm" process="@this"
+                                                 styleClass="btn btn-sm btn-outline" />
+                            </p:column>
+                        </p:dataTable>
+                    </div>
+
+                    <div class="bulk-actions">
+                        <p:commandButton value="Save all #{bulkAddBean.draftCount} items"
+                                         icon="pi pi-check"
+                                         action="#{bulkAddBean.saveAll()}"
+                                         update="draftsForm :uploadForm :growl"
+                                         styleClass="btn btn-primary" />
+                        <p:commandButton value="Discard drafts" icon="pi pi-trash"
+                                         action="#{bulkAddBean.clearDrafts()}"
+                                         update="draftsForm :uploadForm" process="@this"
+                                         styleClass="btn btn-outline">
+                            <p:confirm header="Discard drafts"
+                                       message="Throw away all unsaved drafts?"
+                                       icon="pi pi-exclamation-triangle" />
+                        </p:commandButton>
+                        <h:link outcome="/wardrobe" styleClass="btn btn-outline">Done</h:link>
+                    </div>
+                </div>
+            </ui:fragment>
+
+            <!-- Empty state -->
+            <ui:fragment rendered="#{!bulkAddBean.hasDrafts}">
+                <div class="empty-state">
+                    <i class="pi pi-images empty-icon"></i>
+                    <h3>No drafts yet</h3>
+                    <p>Add some photos above and they will appear here, ready to label.</p>
+                    <ui:fragment rendered="#{bulkAddBean.savedCount gt 0}">
+                        <p class="bulk-saved-note">
+                            <i class="pi pi-check-circle"></i>
+                            Last batch added #{bulkAddBean.savedCount}
+                            #{bulkAddBean.savedCount == 1 ? 'item' : 'items'} to your wardrobe.
+                        </p>
+                    </ui:fragment>
+                </div>
+            </ui:fragment>
+
+            <p:confirmDialog global="true" showEffect="fade" hideEffect="fade" responsive="true">
+                <p:commandButton value="Yes" type="button"
+                                 styleClass="ui-confirmdialog-yes btn btn-primary" />
+                <p:commandButton value="Cancel" type="button"
+                                 styleClass="ui-confirmdialog-no btn btn-outline" />
+            </p:confirmDialog>
+        </h:form>
+
+    </ui:define>
+</ui:composition>
+</html>

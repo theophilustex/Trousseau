@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+
+<ui:composition template="/templates/layout.xhtml">
+    <ui:define name="title">Shared Items</ui:define>
+    <ui:define name="content">
+
+        <h2 class="page-title">Shared Items</h2>
+
+        <h:form id="sharedForm">
+            <p:tabView styleClass="shared-tabs">
+                <!-- Shared With Me Tab -->
+                <p:tab title="Shared With Me">
+                    <div class="shared-list">
+                        <ui:repeat value="#{sharedItemsBean.sharedWithMe}" var="share">
+                            <div class="shared-item">
+                                <div class="shared-info">
+                                    <div class="shared-icon">
+                                        <i class="pi #{share.clothingItem != null ? 'pi-image' : 'pi-star'}"></i>
+                                    </div>
+                                    <div class="shared-details">
+                                        <h4>
+                                            <ui:fragment rendered="#{share.clothingItem != null}">
+                                                <h:link outcome="/clothing-detail" styleClass="shared-link">
+                                                    <f:param name="id" value="#{share.clothingItem.id}" />
+                                                    #{share.clothingItem.name}
+                                                </h:link>
+                                                <span class="badge badge-category">Clothing Item</span>
+                                            </ui:fragment>
+                                            <ui:fragment rendered="#{share.outfit != null}">
+                                                <h:link outcome="/outfit-detail" styleClass="shared-link">
+                                                    <f:param name="id" value="#{share.outfit.id}" />
+                                                    #{share.outfit.name}
+                                                </h:link>
+                                                <span class="badge badge-occasion">Outfit</span>
+                                            </ui:fragment>
+                                        </h4>
+                                        <p class="shared-by">
+                                            Shared by <strong>#{share.owner.displayName}</strong>
+                                            on #{share.createdAt}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </ui:repeat>
+                        <div class="empty-state" rendered="#{empty sharedItemsBean.sharedWithMe}">
+                            <i class="pi pi-inbox empty-icon"></i>
+                            <p>Nothing has been shared with you yet.</p>
+                        </div>
+                    </div>
+                </p:tab>
+
+                <!-- Shared By Me Tab -->
+                <p:tab title="Shared By Me">
+                    <div class="shared-list">
+                        <ui:repeat value="#{sharedItemsBean.sharedByMe}" var="share">
+                            <div class="shared-item">
+                                <div class="shared-info">
+                                    <div class="shared-icon">
+                                        <i class="pi #{share.clothingItem != null ? 'pi-image' : 'pi-star'}"></i>
+                                    </div>
+                                    <div class="shared-details">
+                                        <h4>
+                                            <ui:fragment rendered="#{share.clothingItem != null}">
+                                                #{share.clothingItem.name}
+                                                <span class="badge badge-category">Clothing Item</span>
+                                            </ui:fragment>
+                                            <ui:fragment rendered="#{share.outfit != null}">
+                                                #{share.outfit.name}
+                                                <span class="badge badge-occasion">Outfit</span>
+                                            </ui:fragment>
+                                        </h4>
+                                        <p class="shared-by">
+                                            Shared with <strong>#{share.sharedWith.displayName}</strong>
+                                            on #{share.createdAt}
+                                        </p>
+                                    </div>
+                                </div>
+                                <p:commandButton icon="pi pi-times" title="Unshare"
+                                               action="#{sharedItemsBean.unshare(share)}"
+                                               update="@form"
+                                               styleClass="btn btn-sm btn-danger" />
+                            </div>
+                        </ui:repeat>
+                        <div class="empty-state" rendered="#{empty sharedItemsBean.sharedByMe}">
+                            <i class="pi pi-inbox empty-icon"></i>
+                            <p>You haven't shared anything yet.</p>
+                        </div>
+                    </div>
+                </p:tab>
+            </p:tabView>
+        </h:form>
+
+    </ui:define>
+</ui:composition>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+
+<ui:composition template="/templates/layout.xhtml">
+    <ui:define name="title">Data Management</ui:define>
+    <ui:define name="content">
+
+        <div class="page-header">
+            <h2 class="page-title">Data Management</h2>
+        </div>
+
+        <div class="data-management-grid">
+
+            <!-- Export -->
+            <div class="card data-card">
+                <div class="data-card-icon export-icon">
+                    <i class="pi pi-download"></i>
+                </div>
+                <h3 class="data-card-title">Export Your Data</h3>
+                <p class="data-card-desc">
+                    Download all your wardrobe data — clothing items (including images),
+                    outfits, tags, and wear history — as a single JSON file.
+                    Use this as a backup or to migrate to another device.
+                </p>
+                <h:form id="exportForm">
+                    <p:commandButton value="Download Export" icon="pi pi-download"
+                                   ajax="false"
+                                   styleClass="btn btn-primary data-action-btn">
+                        <p:fileDownload value="#{dataManagementBean.exportData()}" />
+                    </p:commandButton>
+                </h:form>
+            </div>
+
+            <!-- Import -->
+            <div class="card data-card">
+                <div class="data-card-icon import-icon">
+                    <i class="pi pi-upload"></i>
+                </div>
+                <h3 class="data-card-title">Import Data</h3>
+                <p class="data-card-desc">
+                    Import a previously exported Trousseau JSON file.
+                    All clothing items, outfits, tags, and wear history in the file
+                    will be added to your account. Existing data will not be removed.
+                </p>
+                <h:form id="importForm" enctype="multipart/form-data">
+                    <div class="import-upload-area">
+                        <p:fileUpload value="#{dataManagementBean.importFile}"
+                                     mode="simple"
+                                     skinSimple="true"
+                                     accept=".json,application/json"
+                                     styleClass="form-input" />
+                    </div>
+                    <p:commandButton value="Import" icon="pi pi-upload"
+                                   action="#{dataManagementBean.importData()}"
+                                   update="importForm :growl"
+                                   ajax="false"
+                                   styleClass="btn btn-primary data-action-btn" />
+
+                    <div class="import-result" rendered="#{not empty dataManagementBean.importResult}">
+                        <i class="pi pi-check-circle"></i>
+                        #{dataManagementBean.importResult}
+                    </div>
+                </h:form>
+            </div>
+
+        </div>
+
+        <!-- Info panel -->
+        <div class="card data-info-panel">
+            <h4><i class="pi pi-info-circle"></i> What is included in the export?</h4>
+            <ul class="data-info-list">
+                <li><i class="pi pi-check"></i> All clothing items with images, receipts, and wear tracking stats</li>
+                <li><i class="pi pi-check"></i> All outfits with their clothing item associations and seasons</li>
+                <li><i class="pi pi-check"></i> All custom tags</li>
+                <li><i class="pi pi-check"></i> Full outfit wear history</li>
+                <li><i class="pi pi-times text-muted"></i> Ratings, comments, and shares are not included</li>
+            </ul>
+        </div>
+
+    </ui:define>
+</ui:composition>
+</html>

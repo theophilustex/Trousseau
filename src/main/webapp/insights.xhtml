@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+
+<ui:composition template="/templates/layout.xhtml">
+    <ui:define name="title">Insights</ui:define>
+    <ui:define name="content">
+
+        <div class="page-header">
+            <div>
+                <h2 class="page-title">Insights</h2>
+                <p class="page-subtitle">What your wardrobe data says about what you actually wear</p>
+            </div>
+        </div>
+
+        <!-- Empty wardrobe -->
+        <ui:fragment rendered="#{insightsBean.emptyWardrobe}">
+            <div class="empty-state">
+                <i class="pi pi-chart-bar empty-icon"></i>
+                <h3>Nothing to report yet</h3>
+                <p>Add a few clothing items and record some wears, then come back.</p>
+                <h:link outcome="/wardrobe" styleClass="btn btn-primary">Go to Wardrobe</h:link>
+            </div>
+        </ui:fragment>
+
+        <ui:fragment rendered="#{!insightsBean.emptyWardrobe}">
+
+            <!-- Headline numbers -->
+            <div class="stats-grid insights-stats">
+                <div class="stats-card">
+                    <i class="pi pi-th-large stats-icon"></i>
+                    <div class="stats-value">#{insightsBean.itemCount}</div>
+                    <div class="stats-label">Clothing Items</div>
+                </div>
+                <div class="stats-card">
+                    <i class="pi pi-star stats-icon"></i>
+                    <div class="stats-value">#{insightsBean.outfitCount}</div>
+                    <div class="stats-label">Outfits</div>
+                </div>
+                <div class="stats-card">
+                    <i class="pi pi-refresh stats-icon"></i>
+                    <div class="stats-value">#{insightsBean.totalItemWears}</div>
+                    <div class="stats-label">Item Wears</div>
+                </div>
+                <div class="stats-card">
+                    <i class="pi pi-calendar stats-icon"></i>
+                    <div class="stats-value">#{insightsBean.loggedOutfitWears}</div>
+                    <div class="stats-label">Outfits Logged</div>
+                </div>
+                <ui:fragment rendered="#{insightsBean.wardrobeValue != null}">
+                    <div class="stats-card">
+                        <i class="pi pi-wallet stats-icon"></i>
+                        <div class="stats-value">
+                            <h:outputText value="#{insightsBean.wardrobeValue}">
+                                <f:convertNumber maxFractionDigits="0" />
+                            </h:outputText>
+                        </div>
+                        <div class="stats-label">Tracked Spend</div>
+                    </div>
+                </ui:fragment>
+            </div>
+
+            <!-- Activity over time -->
+            <div class="card insights-panel">
+                <h3 class="insights-panel-title">
+                    <i class="pi pi-chart-bar"></i> Wear Activity
+                </h3>
+                <p class="insights-panel-note">Outfits logged per month over the last six months.</p>
+
+                <div class="activity-chart">
+                    <ui:repeat value="#{insightsBean.recentActivity}" var="month">
+                        <div class="activity-col" title="#{month.fullLabel}: #{month.wearCount} wears">
+                            <div class="activity-bar-track">
+                                <div class="activity-bar"
+                                     style="height: #{insightsBean.activityBarHeight(month)}%"></div>
+                            </div>
+                            <span class="activity-count">#{month.wearCount}</span>
+                            <span class="activity-label">#{month.label}</span>
+                        </div>
+                    </ui:repeat>
+                </div>
+            </div>
+
+            <div class="insights-grid">
+
+                <!-- Most worn items -->
+                <div class="card insights-panel">
+                    <h3 class="insights-panel-title"><i class="pi pi-arrow-up"></i> Most Worn Items</h3>
+                    <ul class="rank-list">
+                        <ui:repeat value="#{insightsBean.mostWornItems}" var="stat" varStatus="st">
+                            <li class="rank-row">
+                                <span class="rank-index">#{st.index + 1}</span>
+                                <h:link outcome="/clothing-detail" styleClass="rank-name">
+                                    <f:param name="id" value="#{stat.id}" />
+                                    #{stat.name}
+                                </h:link>
+                                <span class="badge badge-category">#{stat.categoryLabel}</span>
+                                <span class="rank-value">#{stat.wearCount}&#215;</span>
+                            </li>
+                        </ui:repeat>
+                    </ul>
+                    <ui:fragment rendered="#{empty insightsBean.mostWornItems}">
+                        <p class="insights-empty">No items yet.</p>
+                    </ui:fragment>
+                </div>
+
+                <!-- Most worn outfits -->
+                <div class="card insights-panel">
+                    <h3 class="insights-panel-title"><i class="pi pi-star"></i> Most Worn Outfits</h3>
+                    <ul class="rank-list">
+                        <ui:repeat value="#{insightsBean.mostWornOutfits}" var="stat" varStatus="st">
+                            <li class="rank-row">
+                                <span class="rank-index">#{st.index + 1}</span>
+                                <h:link outcome="/outfit-detail" styleClass="rank-name">
+                                    <f:param name="id" value="#{stat.id}" />
+                                    #{stat.name}
+                                </h:link>
+                                <ui:fragment rendered="#{not empty stat.occasion}">
+                                    <span class="badge badge-occasion">#{stat.occasion}</span>
+                                </ui:fragment>
+                                <span class="rank-value">#{stat.wearCount}&#215;</span>
+                            </li>
+                        </ui:repeat>
+                    </ul>
+                    <ui:fragment rendered="#{empty insightsBean.mostWornOutfits}">
+                        <p class="insights-empty">No outfit wears recorded yet. Record one from the planner or an outfit page.</p>
+                    </ui:fragment>
+                </div>
+
+                <!-- Never worn -->
+                <div class="card insights-panel">
+                    <h3 class="insights-panel-title"><i class="pi pi-eye-slash"></i> Never Worn</h3>
+                    <p class="insights-panel-note">In the wardrobe, but never recorded as worn.</p>
+                    <ul class="rank-list">
+                        <ui:repeat value="#{insightsBean.neverWornItems}" var="stat">
+                            <li class="rank-row">
+                                <h:link outcome="/clothing-detail" styleClass="rank-name">
+                                    <f:param name="id" value="#{stat.id}" />
+                                    #{stat.name}
+                                </h:link>
+                                <span class="badge badge-category">#{stat.categoryLabel}</span>
+                            </li>
+                        </ui:repeat>
+                    </ul>
+                    <ui:fragment rendered="#{empty insightsBean.neverWornItems}">
+                        <p class="insights-empty">Everything has been worn at least once.</p>
+                    </ui:fragment>
+                </div>
+
+                <!-- Dormant -->
+                <div class="card insights-panel">
+                    <h3 class="insights-panel-title"><i class="pi pi-clock"></i> Gathering Dust</h3>
+                    <p class="insights-panel-note">
+                        Worn before, but not in the last #{insightsBean.dormantAfterDays} days.
+                    </p>
+                    <ul class="rank-list">
+                        <ui:repeat value="#{insightsBean.dormantItems}" var="stat">
+                            <li class="rank-row">
+                                <h:link outcome="/clothing-detail" styleClass="rank-name">
+                                    <f:param name="id" value="#{stat.id}" />
+                                    #{stat.name}
+                                </h:link>
+                                <span class="rank-value muted">#{stat.daysSinceWorn} days ago</span>
+                            </li>
+                        </ui:repeat>
+                    </ul>
+                    <ui:fragment rendered="#{empty insightsBean.dormantItems}">
+                        <p class="insights-empty">Nothing has been sitting idle. Good rotation.</p>
+                    </ui:fragment>
+                </div>
+
+            </div>
+
+            <!-- Category breakdown -->
+            <div class="card insights-panel">
+                <h3 class="insights-panel-title"><i class="pi pi-tags"></i> Wears by Category</h3>
+                <div class="category-chart">
+                    <ui:repeat value="#{insightsBean.wearsByCategory}" var="cat">
+                        <div class="category-row">
+                            <span class="category-name">#{cat.categoryLabel}</span>
+                            <div class="category-bar-track">
+                                <div class="category-bar"
+                                     style="width: #{insightsBean.categoryBarWidth(cat)}%"></div>
+                            </div>
+                            <span class="category-value">
+                                #{cat.totalWears} wears
+                                <span class="muted">&#183; #{cat.itemCount} items &#183; #{cat.wearsPerItem} each</span>
+                            </span>
+                        </div>
+                    </ui:repeat>
+                </div>
+            </div>
+
+            <!-- Cost per wear -->
+            <ui:fragment rendered="#{insightsBean.costTrackingUnused}">
+                <div class="card insights-panel cpw-prompt">
+                    <h3 class="insights-panel-title"><i class="pi pi-wallet"></i> Cost Per Wear</h3>
+                    <p>
+                        None of your items have a purchase price yet. Add one to an item and this
+                        becomes the most useful number on the page &#8212; the coat you wear every
+                        day is cheap, the shoes you wore once are not.
+                    </p>
+                    <h:link outcome="/wardrobe" styleClass="btn btn-outline">Go to Wardrobe</h:link>
+                </div>
+            </ui:fragment>
+
+            <ui:fragment rendered="#{!insightsBean.costTrackingUnused}">
+                <div class="insights-grid">
+                    <div class="card insights-panel">
+                        <h3 class="insights-panel-title"><i class="pi pi-check-circle"></i> Best Value</h3>
+                        <p class="insights-panel-note">Lowest cost per wear &#8212; the items earning their keep.</p>
+                        <ul class="rank-list">
+                            <ui:repeat value="#{insightsBean.bestValueItems}" var="stat" varStatus="st">
+                                <li class="rank-row">
+                                    <span class="rank-index">#{st.index + 1}</span>
+                                    <h:link outcome="/clothing-detail" styleClass="rank-name">
+                                        <f:param name="id" value="#{stat.id}" />
+                                        #{stat.name}
+                                    </h:link>
+                                    <span class="rank-value good">
+                                        <h:outputText value="#{stat.costPerWear}">
+                                            <f:convertNumber minFractionDigits="2" maxFractionDigits="2" />
+                                        </h:outputText>
+                                        <span class="muted">/ wear</span>
+                                    </span>
+                                </li>
+                            </ui:repeat>
+                        </ul>
+                    </div>
+
+                    <div class="card insights-panel">
+                        <h3 class="insights-panel-title"><i class="pi pi-exclamation-circle"></i> Worst Value</h3>
+                        <p class="insights-panel-note">Highest cost per wear. Unworn items count as one wear.</p>
+                        <ul class="rank-list">
+                            <ui:repeat value="#{insightsBean.worstValueItems}" var="stat" varStatus="st">
+                                <li class="rank-row">
+                                    <span class="rank-index">#{st.index + 1}</span>
+                                    <h:link outcome="/clothing-detail" styleClass="rank-name">
+                                        <f:param name="id" value="#{stat.id}" />
+                                        #{stat.name}
+                                    </h:link>
+                                    <span class="rank-value bad">
+                                        <h:outputText value="#{stat.costPerWear}">
+                                            <f:convertNumber minFractionDigits="2" maxFractionDigits="2" />
+                                        </h:outputText>
+                                        <span class="muted">/ wear</span>
+                                    </span>
+                                </li>
+                            </ui:repeat>
+                        </ul>
+                    </div>
+                </div>
+
+                <p class="insights-footnote">
+                    Cost per wear covers the #{insightsBean.pricedItemCount}
+                    #{insightsBean.pricedItemCount == 1 ? 'item that has' : 'items that have'}
+                    a purchase price recorded. Add prices from an item's detail page.
+                </p>
+            </ui:fragment>
+
+        </ui:fragment>
+
+    </ui:define>
+</ui:composition>
+</html>

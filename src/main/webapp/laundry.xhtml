@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+
+<ui:composition template="/templates/layout.xhtml">
+    <ui:define name="title">Laundry</ui:define>
+    <ui:define name="content">
+
+        <h:form id="laundryForm">
+            <div class="page-header">
+                <div>
+                    <h2 class="page-title">Laundry Basket</h2>
+                    <p class="page-subtitle">
+                        Everything that has hit its wash threshold. Clear the basket in one go
+                        when the load comes out.
+                    </p>
+                </div>
+                <ui:fragment rendered="#{!laundryBean.basketEmpty}">
+                    <p:commandButton value="Mark all washed (#{laundryBean.basketCount})"
+                                     icon="pi pi-check-circle"
+                                     action="#{laundryBean.washAll()}"
+                                     update="laundryForm :growl"
+                                     styleClass="btn btn-success">
+                        <p:confirm header="Laundry done"
+                                   message="Mark all #{laundryBean.basketCount} items as washed?"
+                                   icon="pi pi-check-circle" />
+                    </p:commandButton>
+                </ui:fragment>
+            </div>
+
+            <!-- Empty basket -->
+            <ui:fragment rendered="#{laundryBean.basketEmpty}">
+                <div class="empty-state">
+                    <i class="pi pi-check-circle empty-icon laundry-clear-icon"></i>
+                    <h3>Nothing needs washing</h3>
+                    <p>Every item is under its wash threshold. Wear some clothes.</p>
+                    <h:link outcome="/wardrobe" styleClass="btn btn-primary">Go to Wardrobe</h:link>
+                </div>
+            </ui:fragment>
+
+            <ui:fragment rendered="#{!laundryBean.basketEmpty}">
+                <div class="laundry-toolbar">
+                    <p:commandButton value="Select all" icon="pi pi-check-square"
+                                     action="#{laundryBean.selectAll()}"
+                                     update="laundryForm" process="@this"
+                                     styleClass="btn btn-outline btn-sm" />
+                    <p:commandButton value="Clear selection" icon="pi pi-stop"
+                                     action="#{laundryBean.clearSelection()}"
+                                     update="laundryForm" process="@this"
+                                     styleClass="btn btn-outline btn-sm" />
+                    <span class="laundry-count">
+                        #{laundryBean.selectedCount} of #{laundryBean.basketCount} selected
+                    </span>
+                    <p:commandButton value="Wash selected" icon="pi pi-check"
+                                     action="#{laundryBean.washSelected()}"
+                                     update="laundryForm :growl"
+                                     styleClass="btn btn-primary btn-sm" />
+                </div>
+
+                <div class="tablewrap">
+                    <p:dataTable value="#{laundryBean.basket}" var="item"
+                                 selection="#{laundryBean.selected}"
+                                 rowKey="#{item.id}"
+                                 styleClass="laundry-table">
+                        <p:column selectionMode="multiple" styleClass="laundry-col-check" />
+
+                        <p:column headerText="Item">
+                            <div class="laundry-item">
+                                <ui:fragment rendered="#{item.imageData != null}">
+                                    <p:graphicImage value="#{imageStreamer.thumbnail}"
+                                                    styleClass="laundry-thumb">
+                                        <f:param name="itemId" value="#{item.id}" />
+                                    </p:graphicImage>
+                                </ui:fragment>
+                                <ui:fragment rendered="#{item.imageData == null}">
+                                    <div class="laundry-thumb-placeholder"><i class="pi pi-image"></i></div>
+                                </ui:fragment>
+                                <div class="laundry-item-text">
+                                    <h:link outcome="/clothing-detail" styleClass="laundry-item-name">
+                                        <f:param name="id" value="#{item.id}" />
+                                        #{item.name}
+                                    </h:link>
+                                    <span class="badge badge-category">#{item.category}</span>
+                                </div>
+                            </div>
+                        </p:column>
+
+                        <p:column headerText="Wears since wash" styleClass="laundry-col-num">
+                            <span class="laundry-wears">
+                                #{item.wearsSinceWash} / #{item.washAfterWears}
+                            </span>
+                        </p:column>
+
+                        <p:column headerText="Last worn" styleClass="laundry-col-num">
+                            #{item.lastWornDate != null ? item.lastWornDate : '—'}
+                        </p:column>
+
+                        <p:column headerText="Last washed" styleClass="laundry-col-num">
+                            #{item.lastWashedDate != null ? item.lastWashedDate : 'Never'}
+                        </p:column>
+
+                        <p:column styleClass="laundry-col-action">
+                            <p:commandButton icon="pi pi-check" title="Mark this one washed"
+                                             action="#{laundryBean.washItem(item)}"
+                                             update="laundryForm :growl"
+                                             styleClass="btn btn-sm btn-outline" />
+                        </p:column>
+                    </p:dataTable>
+                </div>
+            </ui:fragment>
+
+            <p:confirmDialog global="true" showEffect="fade" hideEffect="fade" responsive="true">
+                <p:commandButton value="Yes" type="button"
+                                 styleClass="ui-confirmdialog-yes btn btn-primary" />
+                <p:commandButton value="Cancel" type="button"
+                                 styleClass="ui-confirmdialog-no btn btn-outline" />
+            </p:confirmDialog>
+        </h:form>
+
+    </ui:define>
+</ui:composition>
+</html>

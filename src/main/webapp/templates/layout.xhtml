@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+<f:view contentType="text/html">
+<h:head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trousseau - <ui:insert name="title">Wardrobe Manager</ui:insert></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet" />
+    <h:outputStylesheet name="css/trousseau.css" />
+    <script>
+        (function() {
+            if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+        function toggleDarkMode() {
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            if (isDark) {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+    </script>
+</h:head>
+<h:body>
+    <div class="app-wrapper">
+        <!-- Navigation Bar -->
+        <nav class="navbar">
+            <div class="navbar-inner">
+                <h:link outcome="/index" styleClass="navbar-brand">Trousseau</h:link>
+
+                <div class="navbar-menu">
+                    <ui:fragment rendered="#{sessionBean.loggedIn}">
+                        <h:link outcome="/wardrobe" styleClass="nav-link">
+                            <i class="pi pi-th-large"></i> Wardrobe
+                        </h:link>
+                        <h:link outcome="/outfits" styleClass="nav-link">
+                            <i class="pi pi-star"></i> Outfits
+                        </h:link>
+                        <h:link outcome="/weekly-planner" styleClass="nav-link">
+                            <i class="pi pi-calendar"></i> Planner
+                        </h:link>
+                        <h:link outcome="/laundry" styleClass="nav-link">
+                            <i class="pi pi-inbox"></i> Laundry
+                        </h:link>
+                        <h:link outcome="/insights" styleClass="nav-link">
+                            <i class="pi pi-chart-bar"></i> Insights
+                        </h:link>
+                        <h:link outcome="/shared" styleClass="nav-link">
+                            <i class="pi pi-share-alt"></i> Shared
+                        </h:link>
+                        <h:link outcome="/profile" styleClass="nav-link">
+                            <i class="pi pi-user"></i> Profile
+                        </h:link>
+                        <h:link outcome="/data-management" styleClass="nav-link">
+                            <i class="pi pi-database"></i> Data
+                        </h:link>
+                    </ui:fragment>
+                </div>
+
+                <div class="navbar-right">
+                    <button class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle dark mode" type="button">
+                        <span class="dark-icon">🌙</span>
+                        <span class="light-icon">☀️</span>
+                    </button>
+                    <ui:fragment rendered="#{sessionBean.loggedIn}">
+                        <span class="nav-user">
+                            <i class="pi pi-user"></i>
+                            #{sessionBean.currentUser.displayName}
+                        </span>
+                        <h:form styleClass="nav-form">
+                            <p:commandButton value="Logout" action="#{sessionBean.logout()}"
+                                           styleClass="btn-logout" ajax="false"
+                                           icon="pi pi-sign-out" />
+                        </h:form>
+                    </ui:fragment>
+                    <ui:fragment rendered="#{!sessionBean.loggedIn}">
+                        <h:link outcome="/login" styleClass="nav-link">Login</h:link>
+                        <h:link outcome="/register" styleClass="nav-link btn-register">Register</h:link>
+                    </ui:fragment>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Growl Messages -->
+        <p:growl id="growl" showDetail="true" life="4000" />
+
+        <!-- Main Content -->
+        <main class="content-wrapper">
+            <ui:insert name="content">
+                <p>No content provided.</p>
+            </ui:insert>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Trousseau - Open Source Wardrobe Manager | Apache License 2.0</p>
+        </footer>
+    </div>
+</h:body>
+</f:view>
+</html>

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+
+<ui:composition template="/templates/layout.xhtml">
+    <ui:define name="title">Item Details</ui:define>
+    <ui:define name="content">
+
+        <f:metadata>
+            <f:viewParam name="id" value="#{clothingDetailBean.itemId}" />
+            <f:event type="preRenderView" listener="#{clothingDetailBean.loadItem}" />
+        </f:metadata>
+
+        <h:form id="detailForm">
+            <div class="detail-container" rendered="#{clothingDetailBean.item != null}">
+                <div class="detail-header">
+                    <h2 class="page-title">
+                        #{clothingDetailBean.item.name}
+                        <ui:fragment rendered="#{clothingDetailBean.item.retired}">
+                            <span class="badge badge-retired">#{clothingDetailBean.item.status.displayName}</span>
+                        </ui:fragment>
+                    </h2>
+                    <h:link outcome="/wardrobe" styleClass="btn btn-outline btn-sm">
+                        <i class="pi pi-arrow-left"></i> Back to Wardrobe
+                    </h:link>
+                </div>
+
+                <div class="detail-layout">
+                    <!-- Left Column: Image -->
+                    <div class="detail-image-section">
+                        <div class="detail-image-wrapper">
+                            <p:graphicImage value="#{imageStreamer.image}"
+                                          styleClass="detail-image"
+                                          rendered="#{clothingDetailBean.item.imageData != null}">
+                                <f:param name="itemId" value="#{clothingDetailBean.item.id}" />
+                            </p:graphicImage>
+                            <ui:fragment rendered="#{clothingDetailBean.item.imageData == null}">
+                                <div class="detail-image-placeholder">
+                                    <i class="pi pi-image"></i>
+                                    <p>No image uploaded</p>
+                                </div>
+                            </ui:fragment>
+                        </div>
+                        <div class="image-actions" rendered="#{clothingDetailBean.item.imageData != null}">
+                            <p:commandButton value="Download Image" icon="pi pi-download"
+                                           ajax="false" styleClass="btn btn-outline">
+                                <p:fileDownload value="#{clothingDetailBean.downloadImage()}" />
+                            </p:commandButton>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Details -->
+                    <div class="detail-info-section">
+                        <!-- Item Info Panel -->
+                        <p:panel header="Item Details" styleClass="detail-panel">
+                            <div class="detail-grid">
+                                <div class="detail-field">
+                                    <span class="field-label">Category</span>
+                                    <span class="field-value badge badge-category">#{clothingDetailBean.item.category}</span>
+                                </div>
+                                <div class="detail-field" rendered="#{not empty clothingDetailBean.item.color}">
+                                    <span class="field-label">Color</span>
+                                    <span class="field-value">#{clothingDetailBean.item.color}</span>
+                                </div>
+                                <div class="detail-field" rendered="#{not empty clothingDetailBean.item.brand}">
+                                    <span class="field-label">Brand</span>
+                                    <span class="field-value">#{clothingDetailBean.item.brand}</span>
+                                </div>
+                                <div class="detail-field" rendered="#{not empty clothingDetailBean.item.size}">
+                                    <span class="field-label">Size</span>
+                                    <span class="field-value">#{clothingDetailBean.item.size}</span>
+                                </div>
+                                <div class="detail-field" rendered="#{not empty clothingDetailBean.item.description}">
+                                    <span class="field-label">Description</span>
+                                    <span class="field-value">#{clothingDetailBean.item.description}</span>
+                                </div>
+                            </div>
+                        </p:panel>
+
+                        <!-- Purchase & Cost Per Wear Panel -->
+                        <p:panel header="Purchase &amp; Value" styleClass="detail-panel">
+                            <ui:fragment rendered="#{clothingDetailBean.item.costPerWear != null}">
+                            <div class="cpw-summary">
+                                <div class="cpw-figure">
+                                    <span class="cpw-number">
+                                        <h:outputText value="#{clothingDetailBean.item.costPerWear}">
+                                            <f:convertNumber minFractionDigits="2" maxFractionDigits="2" />
+                                        </h:outputText>
+                                    </span>
+                                    <span class="cpw-label">Cost Per Wear</span>
+                                </div>
+                                <p class="cpw-explainer">
+                                    <h:outputText value="#{clothingDetailBean.item.purchasePrice}">
+                                        <f:convertNumber minFractionDigits="2" maxFractionDigits="2" />
+                                    </h:outputText>
+                                    paid, worn #{clothingDetailBean.item.wearCount}
+                                    #{clothingDetailBean.item.wearCount == 1 ? 'time' : 'times'}.
+                                    <ui:fragment rendered="#{clothingDetailBean.item.wearCount == 0}">
+                                        Costed as one wear until you wear it.
+                                    </ui:fragment>
+                                </p>
+                            </div>
+                            </ui:fragment>
+
+                            <ui:fragment rendered="#{clothingDetailBean.item.costPerWear == null}">
+                            <div class="cpw-empty">
+                                <i class="pi pi-tag"></i>
+                                <span>Add a price to track cost per wear for this item.</span>
+                            </div>
+                            </ui:fragment>
+
+                            <div class="dialog-form">
+                                <div class="form-row">
+                                    <div class="form-group half">
+                                        <label>Purchase Price</label>
+                                        <p:inputNumber value="#{clothingDetailBean.item.purchasePrice}"
+                                                     decimalPlaces="2" minValue="0"
+                                                     placeholder="0.00" styleClass="form-input" />
+                                    </div>
+                                    <div class="form-group half">
+                                        <label>Purchase Date</label>
+                                        <p:datePicker value="#{clothingDetailBean.item.purchaseDate}"
+                                                    pattern="yyyy-MM-dd" showIcon="true"
+                                                    styleClass="form-input" />
+                                    </div>
+                                </div>
+                                <div class="form-actions">
+                                    <p:commandButton value="Save" icon="pi pi-check"
+                                                   action="#{clothingDetailBean.savePurchaseInfo()}"
+                                                   update="@form :growl"
+                                                   styleClass="btn btn-primary" />
+                                </div>
+                            </div>
+                        </p:panel>
+
+                        <!-- Wear Tracking Panel -->
+                        <p:panel header="Wear Tracking" styleClass="detail-panel">
+                            <div class="wear-tracking">
+                                <div class="wear-stat">
+                                    <span class="wear-number">#{clothingDetailBean.item.wearCount}</span>
+                                    <span class="wear-label">Times Worn</span>
+                                </div>
+                                <div class="wear-stat">
+                                    <span class="wear-number">#{clothingDetailBean.item.wearsSinceWash}</span>
+                                    <span class="wear-label">Wears Since Wash</span>
+                                </div>
+                                <div class="wear-stat">
+                                    <span class="wear-number">#{clothingDetailBean.item.washAfterWears}</span>
+                                    <span class="wear-label">Wash Threshold</span>
+                                </div>
+                                <div class="wear-stat">
+                                    <span class="wear-date">
+                                        #{clothingDetailBean.item.lastWornDate != null ?
+                                          clothingDetailBean.item.lastWornDate : 'Never'}
+                                    </span>
+                                    <span class="wear-label">Last Worn</span>
+                                </div>
+                                <div class="wear-stat">
+                                    <span class="wear-date">
+                                        #{clothingDetailBean.item.lastWashedDate != null ?
+                                          clothingDetailBean.item.lastWashedDate : 'Never'}
+                                    </span>
+                                    <span class="wear-label">Last Washed</span>
+                                </div>
+                            </div>
+
+                            <div class="wash-status #{clothingDetailBean.item.needsWash ? 'needs-wash' : 'clean'}">
+                                <i class="pi #{clothingDetailBean.item.needsWash ? 'pi-exclamation-triangle' : 'pi-check-circle'}"></i>
+                                #{clothingDetailBean.item.needsWash ? 'Needs Washing!' : 'Clean'}
+                            </div>
+
+                            <div class="wear-actions">
+                                <p:commandButton value="Record Wear" icon="pi pi-refresh"
+                                               action="#{clothingDetailBean.recordWear()}"
+                                               update="@form :growl"
+                                               styleClass="btn btn-primary" />
+                                <p:commandButton value="Mark Washed" icon="pi pi-check"
+                                               action="#{clothingDetailBean.markWashed()}"
+                                               update="@form :growl"
+                                               rendered="#{clothingDetailBean.item.needsWash}"
+                                               styleClass="btn btn-success" />
+                            </div>
+                        </p:panel>
+
+                        <!-- Tags Panel -->
+                        <p:panel header="Tags" styleClass="detail-panel">
+                            <div class="tags-display">
+                                <ui:repeat value="#{clothingDetailBean.item.tags.toArray()}" var="tag">
+                                    <span class="tag-chip">
+                                        #{tag.name}
+                                        <p:commandLink action="#{clothingDetailBean.removeTag(tag)}"
+                                                     update="@form" styleClass="tag-remove"
+                                                     title="Remove tag">
+                                            <i class="pi pi-times"></i>
+                                        </p:commandLink>
+                                    </span>
+                                </ui:repeat>
+                                <span class="no-tags" rendered="#{empty clothingDetailBean.item.tags}">
+                                    No tags added yet
+                                </span>
+                            </div>
+                            <div class="tag-add-form">
+                                <p:selectOneMenu value="#{clothingDetailBean.selectedTagId}"
+                                               styleClass="filter-select">
+                                    <f:selectItem itemLabel="Select tag..." itemValue="" />
+                                    <f:selectItems value="#{clothingDetailBean.availableTags}"
+                                                 var="t" itemLabel="#{t.name}" itemValue="#{t.id}" />
+                                </p:selectOneMenu>
+                                <p:commandButton value="Add" icon="pi pi-plus"
+                                               action="#{clothingDetailBean.addTag()}"
+                                               update="@form" styleClass="btn btn-sm btn-outline" />
+                                <p:inputText value="#{clothingDetailBean.newTagName}"
+                                           placeholder="Or create new tag..."
+                                           styleClass="filter-input" />
+                                <p:commandButton value="Create" icon="pi pi-plus"
+                                               action="#{clothingDetailBean.createAndAddTag()}"
+                                               update="@form" styleClass="btn btn-sm btn-primary" />
+                            </div>
+                        </p:panel>
+
+                        <!-- Receipt Panel -->
+                        <p:panel header="Receipt" styleClass="detail-panel">
+                            <ui:fragment rendered="#{clothingDetailBean.item.receiptData != null}">
+                                <div class="receipt-info">
+                                    <i class="pi pi-file"></i>
+                                    <span class="receipt-name">#{clothingDetailBean.item.receiptName}</span>
+                                </div>
+                                <div class="receipt-actions">
+                                    <p:commandButton value="Download Receipt" icon="pi pi-download"
+                                                   ajax="false" styleClass="btn btn-outline btn-sm">
+                                        <p:fileDownload value="#{clothingDetailBean.downloadReceipt()}" />
+                                    </p:commandButton>
+                                    <p:commandButton value="Delete Receipt" icon="pi pi-trash"
+                                                   action="#{clothingDetailBean.deleteReceipt()}"
+                                                   update="@form :growl"
+                                                   styleClass="btn btn-danger btn-sm" />
+                                </div>
+                            </ui:fragment>
+                            <ui:fragment rendered="#{clothingDetailBean.item.receiptData == null}">
+                                <p class="receipt-empty">No receipt uploaded yet.</p>
+                                <div class="receipt-upload">
+                                    <p:fileUpload value="#{clothingDetailBean.uploadedReceipt}"
+                                                 mode="simple" skinSimple="true"
+                                                 accept="image/*,application/pdf"
+                                                 styleClass="form-input" />
+                                    <p:commandButton value="Upload Receipt" icon="pi pi-upload"
+                                                   action="#{clothingDetailBean.uploadReceipt()}"
+                                                   update="@form :growl"
+                                                   styleClass="btn btn-primary btn-sm" ajax="false" />
+                                </div>
+                            </ui:fragment>
+                        </p:panel>
+
+                        <!-- Share Panel -->
+                        <p:panel header="Lifecycle" styleClass="detail-panel">
+                            <ui:fragment rendered="#{!clothingDetailBean.item.retired}">
+                                <p class="lifecycle-note">
+                                    Retiring keeps the item's wear history and final cost per wear.
+                                    Deleting throws them away &#8212; prefer this.
+                                </p>
+                                <div class="dialog-form">
+                                    <div class="form-row">
+                                        <div class="form-group half">
+                                            <label>Status</label>
+                                            <p:selectOneMenu value="#{clothingDetailBean.retireStatus}"
+                                                           styleClass="form-input">
+                                                <f:selectItems value="#{clothingDetailBean.retirementStatuses}"
+                                                               var="st"
+                                                               itemLabel="#{st.displayName}"
+                                                               itemValue="#{st}" />
+                                            </p:selectOneMenu>
+                                        </div>
+                                        <div class="form-group half">
+                                            <label>Note (optional)</label>
+                                            <p:inputText value="#{clothingDetailBean.retireNote}"
+                                                       placeholder="e.g. sold on Vinted"
+                                                       styleClass="form-input" />
+                                        </div>
+                                    </div>
+                                    <div class="form-actions">
+                                        <p:commandButton value="Retire item" icon="pi pi-inbox"
+                                                       action="#{clothingDetailBean.retireItem()}"
+                                                       update="@form :growl"
+                                                       styleClass="btn btn-outline" />
+                                    </div>
+                                </div>
+                            </ui:fragment>
+
+                            <ui:fragment rendered="#{clothingDetailBean.item.retired}">
+                                <div class="lifecycle-retired">
+                                    <p>
+                                        <strong>#{clothingDetailBean.item.status.displayName}</strong>
+                                        <ui:fragment rendered="#{clothingDetailBean.item.retiredOn != null}">
+                                            since #{clothingDetailBean.item.retiredOn}
+                                        </ui:fragment>
+                                    </p>
+                                    <p class="lifecycle-desc">#{clothingDetailBean.item.status.description}</p>
+                                    <ui:fragment rendered="#{not empty clothingDetailBean.item.retiredNote}">
+                                        <p class="lifecycle-desc">&#8220;#{clothingDetailBean.item.retiredNote}&#8221;</p>
+                                    </ui:fragment>
+                                    <p:commandButton value="Return to wardrobe" icon="pi pi-undo"
+                                                   action="#{clothingDetailBean.reactivateItem()}"
+                                                   update="@form :growl"
+                                                   styleClass="btn btn-primary" />
+                                </div>
+                            </ui:fragment>
+                        </p:panel>
+
+                        <p:panel header="Share Item" styleClass="detail-panel">
+                            <div class="share-form">
+                                <p:inputText value="#{clothingDetailBean.shareUsername}"
+                                           placeholder="Enter username to share with..."
+                                           styleClass="form-input" />
+                                <p:commandButton value="Share" icon="pi pi-share-alt"
+                                               action="#{clothingDetailBean.shareItem()}"
+                                               update="@form :growl"
+                                               styleClass="btn btn-primary" />
+                            </div>
+                        </p:panel>
+
+                        <!-- Delete -->
+                        <div class="danger-zone">
+                            <p:commandButton value="Delete Item" icon="pi pi-trash"
+                                           styleClass="btn btn-danger"
+                                           onclick="PF('deleteConfirm').show()" type="button" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </h:form>
+
+        <!-- Delete Confirmation Dialog -->
+        <p:confirmDialog header="Delete Item" widgetVar="deleteConfirm"
+                        message="Are you sure you want to delete this item? This cannot be undone."
+                        severity="alert">
+            <h:form>
+                <p:commandButton value="Yes, Delete" icon="pi pi-check"
+                               action="#{clothingDetailBean.deleteItem()}"
+                               styleClass="btn btn-danger" ajax="false" />
+                <p:commandButton value="Cancel" icon="pi pi-times"
+                               onclick="PF('deleteConfirm').hide()" type="button"
+                               styleClass="btn btn-outline" />
+            </h:form>
+        </p:confirmDialog>
+
+    </ui:define>
+</ui:composition>
+</html>

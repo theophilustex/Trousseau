@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="http://xmlns.jcp.org/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/persistence
+                                 http://xmlns.jcp.org/xml/ns/persistence/persistence_2_2.xsd"
+             version="2.2">
+
+    <persistence-unit name="TrousseauPU" transaction-type="JTA">
+        <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+        <jta-data-source>java:comp/DefaultDataSource</jta-data-source>
+
+        <class>com.trousseau.model.User</class>
+        <class>com.trousseau.model.ClothingItem</class>
+        <class>com.trousseau.model.Tag</class>
+        <class>com.trousseau.model.Outfit</class>
+        <class>com.trousseau.model.Rating</class>
+        <class>com.trousseau.model.Comment</class>
+        <class>com.trousseau.model.Share</class>
+        <class>com.trousseau.model.OutfitWearLog</class>
+        <class>com.trousseau.model.PlannedOutfit</class>
+
+        <properties>
+            <property name="hibernate.hbm2ddl.auto" value="update"/>
+            <!-- No explicit hibernate.dialect: Hibernate resolves it from the
+                 JDBC metadata of whatever datasource is bound. That keeps this
+                 one WAR working against H2 for local development and
+                 PostgreSQL in the Docker/production stack. -->
+            <property name="hibernate.show_sql" value="false"/>
+            <property name="hibernate.format_sql" value="true"/>
+        </properties>
+    </persistence-unit>
+</persistence>

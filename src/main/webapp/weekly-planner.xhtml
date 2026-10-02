@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+
+<ui:composition template="/templates/layout.xhtml">
+    <ui:define name="title">Weekly Planner</ui:define>
+    <ui:define name="content">
+
+        <h:form id="plannerForm">
+            <div class="page-header">
+                <div>
+                    <h2 class="page-title">Weekly Planner</h2>
+                    <p class="page-subtitle">
+                        #{weeklyPlannerBean.weekStart} &#8212; #{weeklyPlannerBean.weekEnd}
+                    </p>
+                </div>
+                <div class="planner-actions">
+                    <div class="week-nav">
+                        <p:commandButton icon="pi pi-chevron-left" title="Previous week"
+                                       action="#{weeklyPlannerBean.previousWeek()}"
+                                       update="plannerForm" process="@this"
+                                       styleClass="btn btn-outline btn-sm" />
+                        <ui:fragment rendered="#{!weeklyPlannerBean.currentWeek}">
+                            <p:commandButton value="This week" icon="pi pi-home"
+                                           action="#{weeklyPlannerBean.thisWeek()}"
+                                           update="plannerForm" process="@this"
+                                           styleClass="btn btn-outline btn-sm" />
+                        </ui:fragment>
+                        <p:commandButton icon="pi pi-chevron-right" title="Next week"
+                                       action="#{weeklyPlannerBean.nextWeek()}"
+                                       update="plannerForm" process="@this"
+                                       styleClass="btn btn-outline btn-sm" />
+                    </div>
+                    <p:commandButton value="Regenerate" icon="pi pi-refresh"
+                                   action="#{weeklyPlannerBean.generatePlan()}"
+                                   update="plannerForm :growl"
+                                   process="@this"
+                                   styleClass="btn btn-primary">
+                        <p:confirm header="Regenerate week"
+                                   message="This replaces the whole week, including any days you picked yourself. Continue?"
+                                   icon="pi pi-exclamation-triangle" />
+                    </p:commandButton>
+                </div>
+            </div>
+
+            <p class="planner-hint">
+                Your plan is saved, so what you see here is what next Sunday's email will send.
+                Change any day with the dropdown, and record a wear when you actually wear it.
+            </p>
+
+            <ui:fragment rendered="#{weeklyPlannerBean.weatherAvailable}">
+                <div class="weather-strip">
+                    <i class="pi pi-sun"></i>
+                    Suggestions factor in the forecast for
+                    <strong>#{weeklyPlannerBean.locationName}</strong>.
+                </div>
+            </ui:fragment>
+            <ui:fragment rendered="#{weeklyPlannerBean.weatherUnavailable}">
+                <div class="weather-strip weather-strip-muted">
+                    <i class="pi pi-exclamation-circle"></i>
+                    No forecast available right now &#8212; planning on freshness and colour alone.
+                </div>
+            </ui:fragment>
+            <ui:fragment rendered="#{!weeklyPlannerBean.weatherConfigured}">
+                <div class="weather-strip weather-strip-muted">
+                    <i class="pi pi-map-marker"></i>
+                    Add your location on your
+                    <h:link outcome="/profile">profile</h:link>
+                    to have the planner account for the weather.
+                </div>
+            </ui:fragment>
+
+            <!-- 7-Day Plan Grid -->
+            <div class="planner-grid">
+                <ui:repeat value="#{weeklyPlannerBean.weekPlan}" var="day" varStatus="status">
+                    <div class="planner-day-card card #{day.today ? 'is-today' : ''} #{day.worn ? 'is-worn' : ''}">
+                        <div class="planner-day-header">
+                            <span class="planner-day-name">
+                                #{day.dayName}
+                                <ui:fragment rendered="#{day.today}">
+                                    <span class="today-dot" title="Today"></span>
+                                </ui:fragment>
+                            </span>
+                            <span class="planner-day-date">#{day.date}</span>
+                        </div>
+
+                        <ui:fragment rendered="#{day.hasForecast}">
+                            <div class="planner-weather #{day.forecast.wet ? 'is-wet' : ''} #{day.forecast.cold ? 'is-cold' : ''} #{day.forecast.hot ? 'is-hot' : ''}">
+                                <i class="pi #{day.forecast.wet ? 'pi-cloud' : (day.forecast.cold ? 'pi-cloud' : 'pi-sun')}"></i>
+                                <span class="planner-weather-temp">#{day.forecast.displayTemp}&#176;C</span>
+                                <ui:fragment rendered="#{day.forecast.wet}">
+                                    <span class="planner-weather-tag">rain</span>
+                                </ui:fragment>
+                            </div>
+                        </ui:fragment>
+
+                        <div class="planner-day-body">
+                            <!-- Outfit assigned to this day -->
+                            <ui:fragment rendered="#{day.outfit != null}">
+                                <div class="planner-outfit-name">#{day.outfit.name}</div>
+
+                                <div class="planner-state-row">
+                                    <ui:fragment rendered="#{day.worn}">
+                                        <span class="badge badge-worn">
+                                            <i class="pi pi-check"></i> Worn
+                                        </span>
+                                    </ui:fragment>
+                                    <ui:fragment rendered="#{day.manuallyChosen}">
+                                        <span class="badge badge-manual">
+                                            <i class="pi pi-user"></i> Your pick
+                                        </span>
+                                    </ui:fragment>
+                                </div>
+
+                                <div class="planner-outfit-meta">
+                                    <ui:fragment rendered="#{not empty day.outfit.occasion}">
+                                        <span class="badge badge-occasion">#{day.outfit.occasion}</span>
+                                    </ui:fragment>
+                                    <ui:repeat value="#{day.outfit.seasons.toArray()}" var="s">
+                                        <span class="badge badge-season">#{s}</span>
+                                    </ui:repeat>
+                                </div>
+
+                                <!-- Item thumbnails -->
+                                <ui:fragment rendered="#{not empty day.outfit.items}">
+                                    <div class="planner-thumbnails">
+                                        <ui:repeat value="#{day.outfit.items}" var="item">
+                                            <div class="planner-thumb">
+                                                <p:graphicImage value="#{imageStreamer.thumbnail}"
+                                                              styleClass="planner-thumb-image"
+                                                              rendered="#{item.imageData != null}">
+                                                    <f:param name="itemId" value="#{item.id}" />
+                                                </p:graphicImage>
+                                                <ui:fragment rendered="#{item.imageData == null}">
+                                                    <div class="planner-thumb-placeholder">
+                                                        <i class="pi pi-image"></i>
+                                                    </div>
+                                                </ui:fragment>
+                                            </div>
+                                        </ui:repeat>
+                                    </div>
+                                </ui:fragment>
+
+                                <!-- Freshness indicators -->
+                                <div class="planner-freshness">
+                                    <ui:repeat value="#{day.outfit.items}" var="item">
+                                        <div class="freshness-item">
+                                            <span class="freshness-name">#{item.name}</span>
+                                            <span class="freshness-badge #{item.needsWash ? 'needs-wash' : (item.wearsSinceWash == 0 ? 'freshly-washed' : 'worn')}">
+                                                <ui:fragment rendered="#{item.needsWash}">
+                                                    <i class="pi pi-exclamation-triangle"></i> Needs Wash
+                                                </ui:fragment>
+                                                <ui:fragment rendered="#{!item.needsWash and item.wearsSinceWash == 0}">
+                                                    <i class="pi pi-check-circle"></i> Fresh
+                                                </ui:fragment>
+                                                <ui:fragment rendered="#{!item.needsWash and item.wearsSinceWash gt 0}">
+                                                    <i class="pi pi-circle"></i> #{item.wearsSinceWash}/#{item.washAfterWears} wears
+                                                </ui:fragment>
+                                            </span>
+                                        </div>
+                                    </ui:repeat>
+                                </div>
+
+                                <div class="planner-day-actions">
+                                    <p:commandButton value="#{day.worn ? 'Wear again' : 'Record wear'}"
+                                                   icon="pi pi-calendar-plus"
+                                                   action="#{weeklyPlannerBean.recordWear(status.index)}"
+                                                   update="plannerForm :growl"
+                                                   process="@this"
+                                                   styleClass="btn btn-sm #{day.worn ? 'btn-outline' : 'btn-success'}" />
+                                    <h:link outcome="/outfit-detail" styleClass="btn btn-sm btn-outline">
+                                        <f:param name="id" value="#{day.outfit.id}" />
+                                        View
+                                    </h:link>
+                                    <p:commandButton icon="pi pi-times" title="Clear this day"
+                                                   action="#{weeklyPlannerBean.clearDay(status.index)}"
+                                                   update="plannerForm :growl"
+                                                   process="@this"
+                                                   styleClass="btn btn-sm btn-outline" />
+                                </div>
+                            </ui:fragment>
+
+                            <!-- No outfit assigned yet -->
+                            <ui:fragment rendered="#{day.outfit == null}">
+                                <div class="planner-empty-day">
+                                    <i class="pi pi-question-circle"></i>
+                                    <p>No outfit assigned</p>
+                                </div>
+                            </ui:fragment>
+
+                            <!-- Manual outfit selection -->
+                            <ui:fragment rendered="#{not empty weeklyPlannerBean.allOutfits}">
+                                <div class="planner-change-section">
+                                    <p:selectOneMenu value="#{day.selectedOutfitId}"
+                                                   styleClass="planner-outfit-select">
+                                        <f:selectItem itemLabel="Change outfit..." itemValue="#{null}" noSelectionOption="true" />
+                                        <f:selectItems value="#{weeklyPlannerBean.allOutfits}"
+                                                      var="o"
+                                                      itemLabel="#{o.name}"
+                                                      itemValue="#{o.id}" />
+                                    </p:selectOneMenu>
+                                    <p:commandButton icon="pi pi-check"
+                                                   title="Apply selection"
+                                                   action="#{weeklyPlannerBean.applyChange(status.index)}"
+                                                   update="plannerForm :growl"
+                                                   process="plannerForm"
+                                                   styleClass="btn btn-sm btn-primary planner-apply-btn" />
+                                </div>
+                            </ui:fragment>
+                        </div>
+                    </div>
+                </ui:repeat>
+            </div>
+
+            <!-- Empty State -->
+            <ui:fragment rendered="#{empty weeklyPlannerBean.allOutfits}">
+                <div class="empty-state">
+                    <i class="pi pi-calendar empty-icon"></i>
+                    <h3>No outfits to plan with</h3>
+                    <p>Create some outfits first, then come back to see your weekly recommendations!</p>
+                    <h:link outcome="/outfits" styleClass="btn btn-primary">Go to Outfits</h:link>
+                </div>
+            </ui:fragment>
+
+            <p:confirmDialog global="true" showEffect="fade" hideEffect="fade" responsive="true">
+                <p:commandButton value="Yes" type="button"
+                               styleClass="ui-confirmdialog-yes btn btn-primary" />
+                <p:commandButton value="Cancel" type="button"
+                               styleClass="ui-confirmdialog-no btn btn-outline" />
+            </p:confirmDialog>
+        </h:form>
+
+    </ui:define>
+</ui:composition>
+</html>

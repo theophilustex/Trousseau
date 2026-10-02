@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+
+<ui:composition template="/templates/layout.xhtml">
+    <ui:define name="title">My Outfits</ui:define>
+    <ui:define name="content">
+
+        <h:form id="outfitsForm">
+            <div class="page-header">
+                <h2 class="page-title">My Outfits</h2>
+                <p:commandButton value="Create Outfit" icon="pi pi-plus"
+                               styleClass="btn btn-primary"
+                               oncomplete="PF('createOutfitDlg').show()"
+                               update=":createOutfitForm" />
+            </div>
+
+            <!-- Filters -->
+            <div class="filters-toolbar">
+                <div class="filter-group">
+                    <p:inputText value="#{outfitListBean.searchTerm}"
+                                 placeholder="Search by name or description..."
+                                 styleClass="filter-input"
+                                 onkeyup="if(event.key==='Enter') #{outfitListBean.applyFilters()}" />
+                </div>
+                <div class="filter-group">
+                    <p:selectOneMenu value="#{outfitListBean.filterSeason}" styleClass="filter-select">
+                        <f:selectItem itemLabel="All Seasons" itemValue="" />
+                        <f:selectItem itemLabel="Spring" itemValue="Spring" />
+                        <f:selectItem itemLabel="Summer" itemValue="Summer" />
+                        <f:selectItem itemLabel="Fall" itemValue="Fall" />
+                        <f:selectItem itemLabel="Winter" itemValue="Winter" />
+                        <f:selectItem itemLabel="All Seasons" itemValue="All Seasons" />
+                    </p:selectOneMenu>
+                </div>
+                <div class="filter-group">
+                    <p:selectOneMenu value="#{outfitListBean.filterOccasion}" styleClass="filter-select">
+                        <f:selectItem itemLabel="All Occasions" itemValue="" />
+                        <f:selectItem itemLabel="Casual" itemValue="Casual" />
+                        <f:selectItem itemLabel="Formal" itemValue="Formal" />
+                        <f:selectItem itemLabel="Business" itemValue="Business" />
+                        <f:selectItem itemLabel="Sport" itemValue="Sport" />
+                        <f:selectItem itemLabel="Date Night" itemValue="Date Night" />
+                        <f:selectItem itemLabel="Party" itemValue="Party" />
+                        <f:selectItem itemLabel="Other" itemValue="Other" />
+                    </p:selectOneMenu>
+                </div>
+                <div class="filter-group">
+                    <p:selectOneMenu value="#{outfitListBean.filterItemId}" styleClass="filter-select"
+                                     rendered="#{not empty outfitListBean.availableItems}">
+                        <f:selectItem itemLabel="All Clothing Items" itemValue="#{null}" />
+                        <f:selectItems value="#{outfitListBean.availableItems}"
+                                       var="ci"
+                                       itemLabel="#{ci.name} (#{ci.category})"
+                                       itemValue="#{ci.id}" />
+                    </p:selectOneMenu>
+                </div>
+                <div class="filter-group">
+                    <p:commandButton value="Search" icon="pi pi-search"
+                                     action="#{outfitListBean.applyFilters()}"
+                                     update="outfitsForm" styleClass="btn btn-primary" />
+                    <p:commandButton value="Clear" icon="pi pi-times"
+                                     action="#{outfitListBean.clearFilters()}"
+                                     update="outfitsForm" styleClass="btn btn-outline" />
+                </div>
+            </div>
+
+            <!-- Outfits Grid -->
+            <div class="items-grid">
+                <ui:repeat value="#{outfitListBean.outfits}" var="outfit">
+                    <div class="card outfit-card">
+                        <div class="card-body">
+                            <h3 class="card-title">#{outfit.name}</h3>
+                            <div class="card-meta">
+                                <span class="badge badge-occasion">#{outfit.occasion}</span>
+                                <ui:repeat value="#{outfit.seasons.toArray()}" var="s">
+                                    <span class="badge badge-season">#{s}</span>
+                                </ui:repeat>
+                                <span class="outfit-item-count">
+                                    <i class="pi pi-th-large"></i> #{outfit.items.size()} items
+                                </span>
+                            </div>
+
+                            <!-- Item Thumbnails -->
+                            <div class="outfit-thumbnails" rendered="#{not empty outfit.items}">
+                                <ui:repeat value="#{outfit.items}" var="outfitItem">
+                                    <div class="outfit-thumb">
+                                        <p:graphicImage value="#{imageStreamer.thumbnail}"
+                                                      styleClass="thumb-image"
+                                                      rendered="#{outfitItem.imageData != null}">
+                                            <f:param name="itemId" value="#{outfitItem.id}" />
+                                        </p:graphicImage>
+                                        <ui:fragment rendered="#{outfitItem.imageData == null}">
+                                            <div class="thumb-placeholder">
+                                                <i class="pi pi-image"></i>
+                                            </div>
+                                        </ui:fragment>
+                                    </div>
+                                </ui:repeat>
+                            </div>
+
+                            <p class="card-description" rendered="#{not empty outfit.description}">
+                                #{outfit.description}
+                            </p>
+
+                            <!-- Rating Display -->
+                            <div class="outfit-rating">
+                                <p:rating value="#{outfit.overallAverageRating != null ?
+                                                   outfit.overallAverageRating.intValue() : 0}"
+                                        readonly="true" stars="5" />
+                                <span class="rating-count">(#{outfit.ratings.size()} ratings)</span>
+                            </div>
+
+                            <div class="card-footer">
+                                <span class="comment-count">
+                                    <i class="pi pi-comment"></i> #{outfit.comments.size()}
+                                </span>
+                                <h:link outcome="/outfit-detail" styleClass="btn btn-sm btn-primary">
+                                    <f:param name="id" value="#{outfit.id}" />
+                                    View Details
+                                </h:link>
+                            </div>
+                        </div>
+                    </div>
+                </ui:repeat>
+            </div>
+
+            <!-- Empty State -->
+            <div class="empty-state" rendered="#{empty outfitListBean.outfits}">
+                <i class="pi pi-star empty-icon"></i>
+                <h3>No outfits yet</h3>
+                <p>Create your first outfit by combining clothing items from your wardrobe!</p>
+            </div>
+        </h:form>
+
+        <!-- Create Outfit Dialog -->
+        <p:dialog header="Create New Outfit" widgetVar="createOutfitDlg"
+                modal="true" responsive="true" width="600" closable="true">
+            <h:form id="createOutfitForm">
+                <div class="dialog-form">
+                    <div class="form-group">
+                        <label>Outfit Name</label>
+                        <p:inputText value="#{outfitListBean.newOutfit.name}" required="true"
+                                   requiredMessage="Outfit name is required"
+                                   placeholder="e.g. Business Meeting Look"
+                                   styleClass="form-input" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description</label>
+                        <p:inputTextarea value="#{outfitListBean.newOutfit.description}"
+                                       rows="3" placeholder="Describe this outfit"
+                                       styleClass="form-input" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Occasion</label>
+                        <p:selectOneMenu value="#{outfitListBean.newOutfit.occasion}"
+                                       styleClass="form-input">
+                            <f:selectItem itemLabel="Select occasion" itemValue="" />
+                            <f:selectItem itemLabel="Casual" itemValue="Casual" />
+                            <f:selectItem itemLabel="Formal" itemValue="Formal" />
+                            <f:selectItem itemLabel="Business" itemValue="Business" />
+                            <f:selectItem itemLabel="Sport" itemValue="Sport" />
+                            <f:selectItem itemLabel="Date Night" itemValue="Date Night" />
+                            <f:selectItem itemLabel="Party" itemValue="Party" />
+                            <f:selectItem itemLabel="Other" itemValue="Other" />
+                        </p:selectOneMenu>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Seasons</label>
+                        <p:selectManyCheckbox value="#{outfitListBean.newOutfit.seasons}"
+                                             layout="responsive" columns="2">
+                            <f:selectItem itemLabel="Spring" itemValue="Spring" />
+                            <f:selectItem itemLabel="Summer" itemValue="Summer" />
+                            <f:selectItem itemLabel="Fall"   itemValue="Fall" />
+                            <f:selectItem itemLabel="Winter" itemValue="Winter" />
+                        </p:selectManyCheckbox>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Select Clothing Items</label>
+                        <p:selectManyCheckbox value="#{outfitListBean.selectedItemIds}"
+                                            layout="responsive" columns="2"
+                                            styleClass="item-checkbox-list">
+                            <f:selectItems value="#{outfitListBean.availableItems}"
+                                         var="ci" itemLabel="#{ci.name} (#{ci.category})"
+                                         itemValue="#{ci.id}" />
+                        </p:selectManyCheckbox>
+                    </div>
+
+                    <div class="form-actions">
+                        <p:commandButton value="Create Outfit" icon="pi pi-check"
+                                       action="#{outfitListBean.createOutfit()}"
+                                       update=":outfitsForm :growl"
+                                       oncomplete="if(!args.validationFailed) PF('createOutfitDlg').hide()"
+                                       styleClass="btn btn-primary" />
+                        <p:commandButton value="Cancel" icon="pi pi-times"
+                                       onclick="PF('createOutfitDlg').hide()"
+                                       type="button" styleClass="btn btn-outline" />
+                    </div>
+                </div>
+            </h:form>
+        </p:dialog>
+
+    </ui:define>
+</ui:composition>
+</html>

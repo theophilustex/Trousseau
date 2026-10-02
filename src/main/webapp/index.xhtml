@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+      xmlns:c="http://xmlns.jcp.org/jsp/jstl/core">
+
+<ui:composition template="/templates/layout.xhtml">
+    <ui:define name="title">Home</ui:define>
+    <ui:define name="content">
+
+        <!-- Hero for non-logged-in users -->
+        <ui:fragment rendered="#{!sessionBean.loggedIn}">
+            <div class="hero-section">
+                <div class="hero-content">
+                    <h1>Trousseau</h1>
+                    <p class="hero-tagline">Your Smart Wardrobe Manager</p>
+                    <p class="hero-description">
+                        Organize your wardrobe, create outfits, track clothing wear,
+                        get wash alerts, rate outfits, and share fashion ideas with friends.
+                    </p>
+                    <div class="hero-features">
+                        <div class="feature-item">
+                            <i class="pi pi-image"></i>
+                            <h3>Upload &amp; Organize</h3>
+                            <p>Upload photos of your clothing and organize with custom tags</p>
+                        </div>
+                        <div class="feature-item">
+                            <i class="pi pi-star"></i>
+                            <h3>Rate Outfits</h3>
+                            <p>Get ratings from your partner, friends, and yourself</p>
+                        </div>
+                        <div class="feature-item">
+                            <i class="pi pi-bell"></i>
+                            <h3>Wash Alerts</h3>
+                            <p>Track wear count and get notified when clothes need washing</p>
+                        </div>
+                        <div class="feature-item">
+                            <i class="pi pi-share-alt"></i>
+                            <h3>Share Ideas</h3>
+                            <p>Share outfits and clothing items with friends for feedback</p>
+                        </div>
+                    </div>
+                    <div class="hero-actions">
+                        <h:link outcome="/register" styleClass="btn btn-primary btn-lg">Get Started</h:link>
+                        <h:link outcome="/login" styleClass="btn btn-outline btn-lg">Login</h:link>
+                    </div>
+                </div>
+            </div>
+        </ui:fragment>
+
+        <!-- Dashboard for logged-in users -->
+        <ui:fragment rendered="#{sessionBean.loggedIn}">
+            <h2 class="page-title">Welcome back, #{sessionBean.currentUser.displayName}!</h2>
+
+            <div class="stats-grid">
+                <div class="stats-card">
+                    <i class="pi pi-th-large stats-icon"></i>
+                    <div class="stats-value">#{wardrobeBean.allItems.size()}</div>
+                    <div class="stats-label">Clothing Items</div>
+                </div>
+                <div class="stats-card">
+                    <i class="pi pi-star stats-icon"></i>
+                    <div class="stats-value">#{outfitListBean.outfits.size()}</div>
+                    <div class="stats-label">Outfits</div>
+                </div>
+                <div class="stats-card warning">
+                    <i class="pi pi-exclamation-triangle stats-icon"></i>
+                    <div class="stats-value">#{wardrobeBean.washAlertCount}</div>
+                    <div class="stats-label">Need Washing</div>
+                </div>
+            </div>
+
+            <div class="dashboard-actions">
+                <h:link outcome="/wardrobe" styleClass="btn btn-primary">
+                    <i class="pi pi-th-large"></i> Go to Wardrobe
+                </h:link>
+                <h:link outcome="/outfits" styleClass="btn btn-outline">
+                    <i class="pi pi-star"></i> View Outfits
+                </h:link>
+            </div>
+        </ui:fragment>
+
+    </ui:define>
+</ui:composition>
+</html>
