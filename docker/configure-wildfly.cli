@@ -1,0 +1,46 @@
+# Configures WildFly for the Trousseau container image.
+#
+# Runs once, at image build time, against an embedded (offline) server. Values
+# written as ${env.NAME:default} are expressions that WildFly resolves from the
+# container's environment each time it starts, so the image contains no
+# credentials and one image serves every deployment. See docs/docker.md for the
+# variables.
+
+embed-server --std-out=echo --server-config=standalone.xml
+
+# --- PostgreSQL ---------------------------------------------------------------
+
+module add --name=org.postgresql --resources=/tmp/jdbc/postgresql.jar --dependencies=javax.api,javax.transaction.api
+
+/subsystem=datasources/jdbc-driver=postgresql:add(driver-name=postgresql, driver-module-name=org.postgresql, driver-xa-datasource-class-name=org.postgresql.xa.PGXADataSource)
+
+/subsystem=datasources/data-source=TrousseauDS:add(jndi-name=java:jboss/datasources/TrousseauDS, driver-name=postgresql, connection-url="jdbc:postgresql://${env.DB_HOST:db}:${env.DB_PORT:5432}/${env.DB_NAME:trousseau}", user-name="${env.DB_USER:trousseau}", password="${env.DB_PASSWORD:}", validate-on-match=true, background-validation=false, valid-connection-checker-class-name=org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLValidConnectionChecker, exception-sorter-class-name=org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLExceptionSorter)
+
+# persistence.xml uses java:comp/DefaultDataSource, which resolves through this
+# binding. Removing ExampleDS (in-memory H2) means a misconfiguration fails at
+# start-up rather than quietly writing data that vanishes on restart.
+/subsystem=ee/service=default-bindings:write-attribute(name=datasource, value=java:jboss/datasources/TrousseauDS)
+/subsystem=datasources/data-source=ExampleDS:remove
+
+# --- Mail (Sunday weekly-plan email) -----------------------------------------
+# SMTP credentials are applied by docker/entrypoint.sh, and only when set: a
+# mail server configured with a username always attempts AUTH, which breaks
+# relays that accept mail without it.
+
+/socket-binding-group=standard-sockets/remote-destination-outbound-socket-binding=mail-smtp:write-attribute(name=host, value="${env.SMTP_HOST:localhost}")
+/socket-binding-group=standard-sockets/remote-destination-outbound-socket-binding=mail-smtp:write-attribute(name=port, value="${env.SMTP_PORT:25}")
+/subsystem=mail/mail-session=default/server=smtp:write-attribute(name=tls, value="${env.SMTP_STARTTLS:false}")
+/subsystem=mail/mail-session=default/server=smtp:write-attribute(name=ssl, value="${env.SMTP_SSL:false}")
+/subsystem=mail/mail-session=default:write-attribute(name=from, value="${env.SMTP_FROM:noreply@trousseau.app}")
+
+# --- HTTP ---------------------------------------------------------------------
+
+# Undertow's default 10 MB request limit is below bulk add's 20 MB per-photo
+# limit, and far below a data import with embedded photos.
+/subsystem=undertow/server=default-server/http-listener=default:write-attribute(name=max-post-size, value="${env.MAX_UPLOAD_BYTES:268435456}")
+
+# Trust X-Forwarded-* headers only when a reverse proxy sets them. Enabled
+# without one, any client could choose the host in password-reset links.
+/subsystem=undertow/server=default-server/http-listener=default:write-attribute(name=proxy-address-forwarding, value="${env.BEHIND_PROXY:false}")
+
+stop-embedded-server

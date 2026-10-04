@@ -20,6 +20,19 @@ It is a Java EE 8 / JSF application (PrimeFaces UI, JPA/Hibernate persistence) p
 
 ## Quick start
 
+### With Docker Compose (recommended for running it)
+
+Prerequisite: Docker with the Compose plugin.
+
+```bash
+cp .env.example .env        # then set DB_PASSWORD (and TZ)
+docker compose up -d --build
+```
+
+Open **http://localhost:8473/trousseau/** and register an account. This runs WildFly with PostgreSQL. Data persists in a Docker volume. Configuration, email, backups and reverse-proxy setup are covered in [Running with Docker Compose](docs/docker.md).
+
+### With Maven (for development)
+
 Prerequisites: **JDK 11 or newer** and **Maven 3.6+**.
 
 ```bash
@@ -32,14 +45,15 @@ Open **http://localhost:8080/trousseau/**, register an account and sign in.
 
 Stop the server with `Ctrl+C`. Your data stays in `~/.trousseau/` and is still there on the next start.
 
-Production deployment, PostgreSQL, email and weather setup are covered in [Setup & deployment](docs/setup-and-deployment.md).
+Deploying to your own WildFly, PostgreSQL, email and weather setup are covered in [Setup & deployment](docs/setup-and-deployment.md).
 
 ## Documentation
 
 | Document | Audience | Contents |
 |---|---|---|
 | [User guide](docs/user-guide.md) | People using the app | Every page and feature, step by step |
-| [Setup & deployment](docs/setup-and-deployment.md) | Self-hosters / operators | Running locally, WildFly, PostgreSQL, SMTP, weather, configuration reference |
+| [Running with Docker Compose](docs/docker.md) | Self-hosters | Configuration, operations, backups, email, reverse proxy, how the image is built |
+| [Setup & deployment](docs/setup-and-deployment.md) | Operators without Docker | Running locally, WildFly, PostgreSQL, SMTP, weather, configuration reference |
 | [How it works](docs/how-it-works.md) | Everyone curious | Planner scoring, wash logic, cost per wear, insights definitions |
 | [Architecture](docs/architecture.md) | Developers | Layers, packages, request flow, key design decisions |
 | [Data model](docs/data-model.md) | Developers | Entities, relationships, schema management |
@@ -62,6 +76,8 @@ Production deployment, PostgreSQL, email and weather setup are covered in [Setup
 
 ```
 pom.xml
+Dockerfile, docker-compose.yml, .env.example
+docker/                        WildFly configuration and entrypoint for the image
 src/main/
 ├── java/com/trousseau/
 │   ├── bean/         JSF backing beans (one per page, plus SessionBean & ImageStreamer)
@@ -75,7 +91,7 @@ src/main/
 ├── resources/
 │   ├── META-INF/persistence.xml
 │   └── messages.properties
-├── scripts/configure-ds.cli   WildFly CLI script used by `mvn wildfly:run`
+├── scripts/configure-ds.cli   WildFly CLI script used by `mvn wildfly:run` (H2)
 └── webapp/
     ├── *.xhtml                One Facelets page per screen
     ├── templates/layout.xhtml Shared nav bar, growl and footer

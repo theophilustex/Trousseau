@@ -106,7 +106,7 @@ Before exposing an instance beyond people you trust:
 
 - [ ] Fix or disable the password-reset flow ([issue 1](#1-password-reset-allows-account-takeover-high))
 - [ ] Add ownership checks to item and outfit detail pages and `ImageStreamer` ([2](#2-item-pages-have-no-ownership-check-high), [3](#3-outfits-are-readable-by-any-user-medium))
-- [ ] Serve only over **HTTPS** (TLS at a reverse proxy) and enable `proxy-address-forwarding` ([Setup](setup-and-deployment.md#running-behind-a-reverse-proxy))
+- [ ] Serve only over **HTTPS** (TLS at a reverse proxy) and enable `proxy-address-forwarding`. In Docker, set `BEHIND_PROXY=true`; enable it only when a proxy is actually in front. See [Setup](setup-and-deployment.md#running-behind-a-reverse-proxy) and [Docker](docker.md#behind-a-reverse-proxy).
 - [ ] Add to `web.xml`:
   ```xml
   <session-config>

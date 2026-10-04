@@ -39,6 +39,7 @@ public class WeeklyPlannerEmailScheduler {
 
     private static final Logger LOG = Logger.getLogger(WeeklyPlannerEmailScheduler.class.getName());
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMMM d, yyyy");
+    private static final String DEFAULT_FROM = "noreply@trousseau.app";
 
     @Inject
     private UserService userService;
@@ -98,8 +99,11 @@ public class WeeklyPlannerEmailScheduler {
             return;
         }
 
+        // The sender comes from the mail session's "from" attribute (mail.from), so
+        // each deployment can use an address its SMTP provider accepts.
+        String from = mailSession.getProperty("mail.from");
         MimeMessage msg = new MimeMessage(mailSession);
-        msg.setFrom(new InternetAddress("noreply@trousseau.app", false));
+        msg.setFrom(new InternetAddress(from != null && !from.isBlank() ? from : DEFAULT_FROM, false));
         msg.setRecipient(Message.RecipientType.TO, new InternetAddress(user.getEmail()));
         msg.setSubject("Your Trousseau Weekly Outfit Plan — Week of " + monday.format(DATE_FMT));
         msg.setContent(buildEmailBody(user, plan, monday), "text/html; charset=UTF-8");

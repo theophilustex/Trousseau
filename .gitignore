@@ -1,0 +1,13 @@
+# Build output (also holds the WildFly that `mvn wildfly:run` downloads)
+target/
+
+# Local Docker Compose settings; contains the database password
+.env
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project

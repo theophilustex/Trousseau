@@ -2,6 +2,9 @@
 
 This guide covers running Trousseau locally, deploying it to a WildFly server, and configuring the database, email and weather integrations.
 
+> **Just want to run it?** [Docker Compose](docker.md) does everything on this page (WildFly, PostgreSQL, email, upload limits, proxy handling) from a single `.env` file. Read on to install onto your own WildFly or to develop locally.
+
+- [Docker Compose](docker.md) (separate page)
 - [Requirements](#requirements)
 - [Running locally](#running-locally)
 - [Deploying to an existing WildFly](#deploying-to-an-existing-wildfly)
@@ -76,6 +79,18 @@ On first start Hibernate creates all tables. No seed data is loaded, so register
    ```
    or copy the WAR into `$JBOSS_HOME/standalone/deployments/`.
 
+### Raise the upload limit
+
+WildFly's HTTP listener rejects requests over **10 MB** by default. That is below bulk add's 20 MB per-photo limit, and far below a data import with embedded photos. Raise it:
+
+```
+/subsystem=undertow/server=default-server/http-listener=default:write-attribute(name=max-post-size,value=268435456)
+```
+
+(Also apply it to `https-listener=https` if you serve HTTPS from WildFly directly.)
+
+### Context path
+
 The context path comes from the WAR name: `trousseau.war` is served at `/trousseau`. To serve the app at `/`, deploy it as `ROOT.war`, or set `<context-root>` in a `jboss-web.xml`.
 
 ### Why the WAR bundles Hibernate
@@ -135,7 +150,10 @@ reload
 
 Things to know:
 
-- **Sender address.** Emails come from `noreply@trousseau.app`, which is hard-coded in `WeeklyPlannerEmailScheduler.sendEmail()`. Many SMTP providers reject senders outside your own domain, so you will probably need to change it.
+- **Sender address.** Emails come from the mail session's `from` attribute, or `noreply@trousseau.app` if it is unset. Many SMTP providers reject senders outside your own domain, so set it:
+  ```
+  /subsystem=mail/mail-session=default:write-attribute(name=from,value=trousseau@example.com)
+  ```
 - **Missed runs are skipped.** The timer is non-persistent. If the server is down at 17:00 on Sunday, that week's emails are not sent later.
 - **Failures are per user.** A failed send is logged as a `WARNING` and the job moves on to the next user. Each run ends with an `INFO` summary: `Weekly planner emails: sent=N, skipped (no email)=M`.
 - **Side effect.** The run saves a plan for next week for every user with an email, so their planner shows that plan when they next open it.
@@ -171,7 +189,7 @@ Trousseau builds absolute URLs in one place: the password-reset link. It uses th
 
 Then have the proxy send `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Port`. Everything else uses relative URLs.
 
-Allow uploads of at least 20 MB through the proxy (e.g. nginx `client_max_body_size 25m;`). Bulk add accepts photos up to that size, and a data import can be much larger because photos are embedded.
+Allow uploads through the proxy up to WildFly's `max-post-size` (e.g. nginx `client_max_body_size 256m;`). Bulk add accepts photos up to 20 MB, and a data import can be much larger because photos are embedded.
 
 ---
 
@@ -190,6 +208,7 @@ Trousseau has no external configuration file. Settings live in the deployment de
 | Schema management | `persistence.xml` → `hibernate.hbm2ddl.auto` | `update` | See [Data model → Schema management](data-model.md#schema-management). |
 | SQL logging | `persistence.xml` → `hibernate.show_sql` | `false` | |
 | WildFly version for `wildfly:run` | `pom.xml` → plugin `<version>` | `26.1.3.Final` | |
+| Max request size | Undertow `http-listener` → `max-post-size` | 10 MB (WildFly default) | Raise it; see [Raise the upload limit](#raise-the-upload-limit). The Docker image defaults to 256 MB. |
 
 ### Code constants
 
@@ -205,7 +224,7 @@ Trousseau has no external configuration file. Settings live in the deployment de
 | Insights list length / activity window | 10 rows / 6 months | `InsightsService` |
 | Weather cache TTL / timeout / max locations | 60 min / 6 s / 200 | `WeatherService` |
 | Weekly email schedule | Sunday 17:00:00 | `@Schedule` on `WeeklyPlannerEmailScheduler` |
-| Email sender | `noreply@trousseau.app` | `WeeklyPlannerEmailScheduler.sendEmail()` |
+| Email sender fallback | `noreply@trousseau.app` | `WeeklyPlannerEmailScheduler.DEFAULT_FROM`, used when the mail session has no `from` |
 | Item categories | 12 fixed values | `ClothingItemService.getCategories()` |
 | Outfit occasions | 7 fixed values | `outfits.xhtml` |
 

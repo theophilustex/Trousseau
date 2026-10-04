@@ -1,0 +1,8 @@
+# Adds SMTP credentials to the mail session. Run by docker/entrypoint.sh only
+# when SMTP_USERNAME is set. The values are expressions, so the password is
+# never written into standalone.xml.
+
+embed-server --std-out=discard --server-config=standalone.xml
+/subsystem=mail/mail-session=default/server=smtp:write-attribute(name=username, value="${env.SMTP_USERNAME}")
+/subsystem=mail/mail-session=default/server=smtp:write-attribute(name=password, value="${env.SMTP_PASSWORD:}")
+stop-embedded-server

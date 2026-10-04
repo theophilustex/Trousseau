@@ -27,6 +27,9 @@ Notes for anyone changing the Trousseau code. Read [Architecture](architecture.m
 | Run with a fresh WildFly | `mvn package wildfly:run` (see [Setup](setup-and-deployment.md#running-locally)) |
 | Redeploy to the running server | From a second terminal: `mvn package wildfly:deploy` |
 | Offline build | `mvn -o package` once dependencies are cached |
+| Run the production-like stack (WildFly + PostgreSQL) | `docker compose up -d --build` (see [Docker](docker.md)) |
+
+Code must work on both H2 (Maven run) and PostgreSQL (Docker), so try changes that touch queries on both.
 
 Facelets pages are re-read in `Development` project stage, but Java changes need a redeploy.
 
@@ -151,12 +154,12 @@ Functional issues in the current code. Security issues are listed separately in 
 | 10 | Ratings | The outfit list's stars (mean of all ratings, truncated) can disagree with the detail page's Overall Average (mean of per-type averages). | Use one definition in both places. |
 | 11 | Seasons | The Winter range ends on 28 Feb, so 29 Feb wears in leap years are not counted in seasonal stats. | Use `YearMonth.of(year, 2).atEndOfMonth()`. |
 | 12 | i18n | `messages.properties` is registered as `#{msg}` in `faces-config.xml`, but no page uses it. All UI text is hard-coded in the XHTML. | Move strings to the bundle, or delete it. |
-| 13 | Email | The sender `noreply@trousseau.app` is hard-coded. | Make it configurable (system property or JNDI env entry). |
+| 13 | Uploads | Outside Docker, WildFly's default 10 MB request limit rejects bulk-add photos over 10 MB (the page allows 20 MB) and most data imports. | Documented in [Setup → Raise the upload limit](setup-and-deployment.md#raise-the-upload-limit); the Docker image sets 256 MB. |
+| 14 | Images | When a photo is too small to need a thumbnail, `ImageStreamer.getThumbnail()` serves the original but always labels it `image/jpeg`, even for PNG/GIF/WebP. Browsers sniff and render it anyway. | Return the item's stored content type when serving the original. |
 
 ---
 
 ## Repository housekeeping
 
-- There is no **`.gitignore`**. Add one with at least `target/`, `.idea/`, `*.iml`, `.vscode/`, `.settings/`, `.classpath`, `.project`, so the built WAR and the downloaded WildFly are not committed.
 - There is no **`LICENSE`** file, although the app footer says Apache License 2.0.
-- Comments in `pom.xml` and `persistence.xml` refer to a Docker image (Temurin 11) and a Docker/PostgreSQL stack. These files are not in this repository.
+- `.gitignore` excludes `target/` and `.env`. Never commit `.env`; it holds the database password.
