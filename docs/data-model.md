@@ -109,7 +109,7 @@ Unique on (`owner_id`, `name`). Tags are private to each user.
 | `occasion` | varchar(100). The UI offers Casual, Formal, Business, Sport, Date Night, Party, Other. |
 | `created_at` | |
 
-- **`outfit_seasons`** (`outfit_id`, `season` varchar(50)): element collection of `Spring` / `Summer` / `Fall` / `Winter`.
+- **`outfit_seasons`** (`outfit_id`, `season` varchar(50)): element collection of `Spring` / `Summer` / `Fall` / `Winter`. Unique on (`outfit_id`, `season`), since it is a set; Hibernate 7 added this constraint to databases created by older versions.
 - **`outfit_items`** (`outfit_id`, `clothing_item_id`): ordered `List<ClothingItem>`. `Outfit` is the owning side, and `ClothingItem` has no inverse mapping.
 - `ratings` and `comments`: `@OneToMany(cascade = ALL, orphanRemoval = true)`.
 

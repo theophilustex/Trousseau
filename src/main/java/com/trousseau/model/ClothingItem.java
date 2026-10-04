@@ -5,9 +5,9 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import javax.persistence.*;
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Size;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -36,8 +36,10 @@ import java.util.Set;
     @NamedQuery(name = "ClothingItem.findNeedingWash",
         query = "SELECT DISTINCT c FROM ClothingItem c LEFT JOIN FETCH c.tags WHERE c.owner = :owner AND c.needsWash = true "
               + "AND (c.status IS NULL OR c.status = com.trousseau.model.ItemStatus.ACTIVE) ORDER BY c.name"),
+    // MEMBER OF rather than filtering on the fetch join: JPA forbids an alias on a
+    // fetch join, and filtering through one would load only the matching tag per item.
     @NamedQuery(name = "ClothingItem.findByTag",
-        query = "SELECT DISTINCT c FROM ClothingItem c LEFT JOIN FETCH c.tags t WHERE t = :tag "
+        query = "SELECT DISTINCT c FROM ClothingItem c LEFT JOIN FETCH c.tags WHERE :tag MEMBER OF c.tags "
               + "AND (c.status IS NULL OR c.status = com.trousseau.model.ItemStatus.ACTIVE)")
 })
 @Getter @Setter

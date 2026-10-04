@@ -5,9 +5,9 @@ import com.trousseau.model.OutfitWearLog;
 import com.trousseau.model.OutfitWearStat;
 import com.trousseau.model.User;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.LocalDate;
 import java.util.List;
 

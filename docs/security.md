@@ -26,9 +26,9 @@ This page describes how Trousseau handles authentication and access control, lis
 | Logout | Invalidates the session |
 | Session ID on login | Not rotated (`HttpServletRequest.changeSessionId()` is not called) |
 | Password change / reset | Signs out every **other** session on its next request. The session that changed the password stays signed in. See [Sessions and password changes](#sessions-and-password-changes). |
-| CSRF | JSF postbacks require a valid `javax.faces.ViewState`, which gives some protection for form actions. No explicit CSRF tokens or `<protected-views>`. |
+| CSRF | JSF postbacks require a valid `jakarta.faces.ViewState`, which gives some protection for form actions. No explicit CSRF tokens or `<protected-views>`. |
 
-`AuthFilter` lets signed-out visitors reach exactly these pages: `index`, `login`, `register`, `forgot-password` and `reset-password`, plus JSF resources (`/javax.faces.resource/…`). Everything else redirects to login. It matches on the container-normalised **servlet path**, never on the raw request URI (see [fixed issue A](#fixed-issues)).
+`AuthFilter` lets signed-out visitors reach exactly these pages: `index`, `login`, `register`, `forgot-password` and `reset-password`, plus Faces resources (`/jakarta.faces.resource/…`). Everything else redirects to login. It matches on the container-normalised **servlet path**, never on the raw request URI (see [fixed issue A](#fixed-issues)).
 
 ## Sessions and password changes
 
@@ -87,7 +87,7 @@ Ordered by severity.
 
 ### 1. Uploaded content type is trusted (Medium)
 
-The photo's `Content-Type` and filename come from the browser and are served back unchanged by `ImageStreamer.getImage()`. Type restrictions (`allowTypes`) are declared on the PrimeFaces upload components, and receipts accept `image/*` and PDF. Nothing on the server checks that the bytes really are an image. A crafted upload could be served inline as `text/html` from the app's origin, to its owner and anyone it's shared with.
+The photo's `Content-Type` comes from the browser and is served back unchanged by `ImageStreamer.getImage()`. `<p:validateFile>` checks the **file name** extension and size on the server (photos must end in `.gif`, `.jpg`, `.jpeg`, `.png` or `.webp`; bulk add caps each at 20 MB), but nothing checks that the bytes really are an image, and the data import accepts whatever it is given. A crafted upload with an image file name could still be served inline as `text/html` from the app's origin, to its owner and anyone it's shared with.
 
 **Fix:** on upload, decode with `ImageIO` (already done for thumbnails) and reject files that fail. Serve photos with a fixed `image/*` type. Add an `X-Content-Type-Options: nosniff` response header.
 
@@ -101,7 +101,7 @@ The session ID is not changed at login. Call `request.changeSessionId()` in `Log
 
 ### 4. Development project stage (Low)
 
-`web.xml` ships with `javax.faces.PROJECT_STAGE=Development`, which shows detailed error pages including stack traces and EL expressions. Set it to `Production`.
+`web.xml` ships with `jakarta.faces.PROJECT_STAGE=Development`, which shows detailed error pages including stack traces and EL expressions. Set it to `Production`.
 
 ---
 
@@ -146,7 +146,7 @@ Before exposing an instance beyond people you trust:
       <tracking-mode>COOKIE</tracking-mode>
   </session-config>
   ```
-- [ ] Set `javax.faces.PROJECT_STAGE` to `Production`
+- [ ] Set `jakarta.faces.PROJECT_STAGE` to `Production`
 - [ ] Rate-limit `/trousseau/login.xhtml` and `/trousseau/forgot-password.xhtml` at the proxy
 - [ ] Use PostgreSQL with a dedicated, least-privilege database user and a strong password
 - [ ] Protect the WildFly management interface (port 9990): bind it to localhost or firewall it

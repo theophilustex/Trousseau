@@ -136,3 +136,5 @@ Importing the same file twice therefore duplicates items, outfits and wear logs.
 ## Size
 
 Photos and receipts are embedded as base64, which adds about 33% to their size. A wardrobe of 200 items with 3 MB photos makes an export of about 800 MB. Import reads the whole file into memory, so large imports need a matching JVM heap (`-Xmx`) and a reverse proxy that allows large request bodies.
+
+The JSON parser in WildFly 41 (Eclipse Parsson) refuses documents over 15 million characters by default. `DataExportImportService` lifts that limit for its own reader, so only the HTTP request limit (`MAX_UPLOAD_BYTES` in Docker, `max-post-size` in WildFly) bounds an import.

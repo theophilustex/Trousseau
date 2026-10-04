@@ -7,9 +7,9 @@ import com.trousseau.model.ItemWearStat;
 import com.trousseau.model.Tag;
 import com.trousseau.model.User;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;

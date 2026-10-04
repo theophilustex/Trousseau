@@ -10,7 +10,7 @@ embed-server --std-out=echo --server-config=standalone.xml
 
 # --- PostgreSQL ---------------------------------------------------------------
 
-module add --name=org.postgresql --resources=/tmp/jdbc/postgresql.jar --dependencies=javax.api,javax.transaction.api
+module add --name=org.postgresql --resources=/tmp/jdbc/postgresql.jar --dependencies=javax.api,jakarta.transaction.api
 
 /subsystem=datasources/jdbc-driver=postgresql:add(driver-name=postgresql, driver-module-name=org.postgresql, driver-xa-datasource-class-name=org.postgresql.xa.PGXADataSource)
 

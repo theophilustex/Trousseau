@@ -3,10 +3,10 @@ package com.trousseau.dao;
 import com.trousseau.model.Outfit;
 import com.trousseau.model.User;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.persistence.EntityManager;
-import javax.persistence.NoResultException;
-import javax.persistence.PersistenceContext;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
+import jakarta.persistence.PersistenceContext;
 import java.util.List;
 
 @ApplicationScoped

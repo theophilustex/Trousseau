@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"
-      xmlns:h="http://xmlns.jcp.org/jsf/html"
-      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:h="jakarta.faces.html"
+      xmlns:f="jakarta.faces.core"
       xmlns:p="http://primefaces.org/ui"
-      xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+      xmlns:ui="jakarta.faces.facelets">
 
 <ui:composition template="/templates/layout.xhtml">
     <ui:define name="title">Add Items in Bulk</ui:define>
@@ -34,12 +34,14 @@
                 </div>
                 <p:fileUpload listener="#{bulkAddBean.handleUpload}"
                               mode="advanced" multiple="true" auto="true"
-                              dragDropSupport="true"
+                              dragDrop="true"
                               label="Choose photos"
-                              allowTypes="/(\.|\/)(gif|jpe?g|png|webp)$/i"
-                              sizeLimit="20000000"
+                              accept="image/gif,image/jpeg,image/png,image/webp"
                               update=":draftsForm :uploadForm :growl"
-                              styleClass="bulk-uploader" />
+                              styleClass="bulk-uploader">
+                    <!-- Checked in the browser and again on the server. -->
+                    <p:validateFile allowTypes="/(\.|\/)(gif|jpe?g|png|webp)$/i" sizeLimit="20000000" />
+                </p:fileUpload>
                 <p class="bulk-limit-note">
                     #{bulkAddBean.draftCount} of #{bulkAddBean.maxDrafts} draft slots used.
                 </p>

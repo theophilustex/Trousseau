@@ -7,8 +7,8 @@ import com.trousseau.model.Outfit;
 import com.trousseau.model.PlannedOutfit;
 import com.trousseau.model.User;
 
-import javax.ejb.Stateless;
-import javax.inject.Inject;
+import jakarta.ejb.Stateless;
+import jakarta.inject.Inject;
 import java.time.LocalDate;
 import java.util.*;
 

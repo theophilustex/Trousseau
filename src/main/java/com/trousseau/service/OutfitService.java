@@ -5,8 +5,8 @@ import com.trousseau.model.ClothingItem;
 import com.trousseau.model.Outfit;
 import com.trousseau.model.User;
 
-import javax.ejb.Stateless;
-import javax.inject.Inject;
+import jakarta.ejb.Stateless;
+import jakarta.inject.Inject;
 import java.util.List;
 
 @Stateless

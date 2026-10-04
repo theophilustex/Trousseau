@@ -2,7 +2,7 @@
 
 **Your smart wardrobe manager.** Trousseau is a self-hosted web app for cataloguing the clothes you own, putting them together into outfits, planning what to wear each week, and learning from what you actually wear.
 
-It is a Java EE 8 / JSF application (PrimeFaces UI, JPA/Hibernate persistence) packaged as a WAR for WildFly. It runs on a LAN with no internet access; the only outbound call it makes is an optional weather lookup.
+It is a Jakarta EE 11 application (Jakarta Faces with PrimeFaces, Jakarta Persistence with Hibernate) on Java 21, packaged as a WAR for WildFly. It runs on a LAN with no internet access; the only outbound call it makes is an optional weather lookup.
 
 ## Features
 
@@ -33,13 +33,13 @@ Open **http://localhost:8473/trousseau/** and register an account. This runs Wil
 
 ### With Maven (for development)
 
-Prerequisites: **JDK 11 or newer** and **Maven 3.6+**.
+Prerequisites: **JDK 21 or newer** and **Maven 3.6+**.
 
 ```bash
 mvn clean package wildfly:run
 ```
 
-The first run downloads WildFly 26.1.3 (about 200 MB). It configures the server's default datasource to use an H2 database file at `~/.trousseau/trousseau.mv.db`, then deploys the app.
+The first run downloads WildFly 41.0.1 (about 270 MB). It configures the server's default datasource to use an H2 database file at `~/.trousseau/trousseau.mv.db`, then deploys the app.
 
 Open **http://localhost:8080/trousseau/**, register an account and sign in.
 
@@ -65,12 +65,12 @@ Deploying to your own WildFly, PostgreSQL, email and weather setup are covered i
 
 | Layer | Technology |
 |---|---|
-| Runtime | WildFly 26.1.3 (Java EE 8), Java 11 bytecode |
-| UI | JSF 2.3 (Facelets), PrimeFaces 12 (Saga theme), custom CSS |
-| Business logic | EJB 3.2 (`@Stateless`, `@Singleton`, `@Schedule`), CDI 2.0 |
-| Persistence | JPA 2.2 with Hibernate 5.6 (bundled in the WAR), schema managed by `hbm2ddl=update` |
-| Database | H2 (local/dev) or PostgreSQL (production). The dialect is auto-detected. |
-| Other | jBCrypt (password hashing), JavaMail (weekly email), Open-Meteo (forecast), Lombok |
+| Runtime | WildFly 41.0.1 (Jakarta EE 11), Java 21 |
+| UI | Jakarta Faces 4.1 (Facelets), PrimeFaces 16 (Saga theme), custom CSS |
+| Business logic | Jakarta Enterprise Beans 4.0 (`@Stateless`, `@Singleton`, `@Schedule`), CDI 4.1 |
+| Persistence | Jakarta Persistence 3.2 with Hibernate ORM 7.4 (provided by WildFly), schema managed by `hbm2ddl=update` |
+| Database | H2 2.x (local/dev) or PostgreSQL (production). The dialect is auto-detected. |
+| Other | jBCrypt (password hashing), Jakarta Mail (weekly and reset emails), Open-Meteo (forecast), Lombok |
 
 ## Project layout
 
@@ -96,7 +96,7 @@ src/main/
     ├── *.xhtml                One Facelets page per screen
     ├── templates/layout.xhtml Shared nav bar, growl and footer
     ├── resources/css/trousseau.css
-    └── WEB-INF/               web.xml, faces-config.xml, beans.xml, jboss-deployment-structure.xml
+    └── WEB-INF/               web.xml, faces-config.xml, beans.xml
 ```
 
 ## Status and known issues

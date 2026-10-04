@@ -1,14 +1,14 @@
 package com.trousseau.service;
 
-import javax.annotation.Resource;
-import javax.ejb.Asynchronous;
-import javax.ejb.Stateless;
-import javax.mail.Message;
-import javax.mail.MessagingException;
-import javax.mail.Session;
-import javax.mail.Transport;
-import javax.mail.internet.InternetAddress;
-import javax.mail.internet.MimeMessage;
+import jakarta.annotation.Resource;
+import jakarta.ejb.Asynchronous;
+import jakarta.ejb.Stateless;
+import jakarta.mail.Message;
+import jakarta.mail.MessagingException;
+import jakarta.mail.Session;
+import jakarta.mail.Transport;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -58,11 +58,5 @@ public class MailService {
         } catch (MessagingException | RuntimeException e) {
             LOG.log(Level.WARNING, "Failed to send \"" + subject + "\" to " + to, e);
         }
-    }
-
-    /** Escapes text for inclusion in an email body. */
-    public static String escapeHtml(String s) {
-        if (s == null) return "";
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 }

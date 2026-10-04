@@ -1,18 +1,20 @@
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"
-      xmlns:h="http://xmlns.jcp.org/jsf/html"
-      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:h="jakarta.faces.html"
+      xmlns:f="jakarta.faces.core"
       xmlns:p="http://primefaces.org/ui"
-      xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+      xmlns:ui="jakarta.faces.facelets">
 
 <ui:composition template="/templates/layout.xhtml">
     <ui:define name="title">Outfit Details</ui:define>
-    <ui:define name="content">
-
+    <ui:define name="metadata">
         <f:metadata>
             <f:viewParam name="id" value="#{outfitDetailBean.outfitId}" />
             <f:event type="preRenderView" listener="#{outfitDetailBean.loadOutfit}" />
         </f:metadata>
+    </ui:define>
+
+    <ui:define name="content">
 
         <h:form id="outfitDetailForm">
             <div class="detail-container" rendered="#{outfitDetailBean.outfit != null}">

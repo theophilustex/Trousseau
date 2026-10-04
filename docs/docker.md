@@ -1,6 +1,6 @@
 # Running with Docker Compose
 
-The simplest way to self-host Trousseau. One command starts the app (WildFly 26.1.3 on Eclipse Temurin 11) and a PostgreSQL 16 database. All data, photos included, is kept in a Docker volume.
+The simplest way to self-host Trousseau. One command starts the app (WildFly 41 on Eclipse Temurin 21) and a PostgreSQL 16 database. All data, photos included, is kept in a Docker volume.
 
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
@@ -159,18 +159,18 @@ Set `TROUSSEAU_BASE_URL` to the public `https://` address too. Emailed links are
 
 The [`Dockerfile`](../Dockerfile) has three stages:
 
-1. **build** (`maven:3.9-eclipse-temurin-11`): runs `mvn package` and copies out the PostgreSQL JDBC driver at the version `pom.xml` pins. A BuildKit cache mount keeps `~/.m2` between builds.
-2. **wildfly** (`eclipse-temurin:11-jre`): downloads the WildFly 26.1.3 release tarball, verifies its SHA-1, and runs [`docker/configure-wildfly.cli`](../docker/configure-wildfly.cli) against an embedded server. That script:
+1. **build** (`maven:3.9-eclipse-temurin-21`): runs `mvn package` and copies out the PostgreSQL JDBC driver at the version `pom.xml` pins. A BuildKit cache mount keeps `~/.m2` between builds.
+2. **wildfly** (`eclipse-temurin:21-jre`): downloads the WildFly 41.0.1 release tarball, verifies its SHA-256 against the value GitHub publishes for the release asset, and runs [`docker/configure-wildfly.cli`](../docker/configure-wildfly.cli) against an embedded server. That script:
    - installs the PostgreSQL driver as a module and creates the `TrousseauDS` datasource
    - points `java:comp/DefaultDataSource` at it, and removes the in-memory `ExampleDS` so a misconfiguration fails loudly
    - wires the mail session, upload limit and proxy handling to the environment variables above
-3. **runtime** (`eclipse-temurin:11-jre`): the configured WildFly plus `trousseau.war`. It runs as the unprivileged `wildfly` user and has a health check on `/trousseau/login.xhtml`.
+3. **runtime** (`eclipse-temurin:21-jre`): the configured WildFly plus `trousseau.war`. It runs as the unprivileged `wildfly` user and has a health check on `/trousseau/login.xhtml`.
 
 Settings are stored in `standalone.xml` as **expressions** like `${env.DB_HOST:db}`, which WildFly resolves from the environment at each start. The image therefore contains no credentials, and one image works for any deployment.
 
 The one exception is SMTP authentication. WildFly always attempts SMTP AUTH when a username is configured, even an empty one, which would break relays that need no login. So [`docker/entrypoint.sh`](../docker/entrypoint.sh) adds the username and password (again as expressions) at container start, and only when `SMTP_USERNAME` is set.
 
-**Why not the official `quay.io/wildfly/wildfly:26.1.3.Final` image?** That image is no longer rebuilt. It runs CentOS 7, which reached end of life in June 2024, and a JDK from October 2022. Building on `eclipse-temurin:11-jre` means `docker compose build --pull` brings in current Java 11 and Ubuntu security updates.
+**Why not the official `quay.io/wildfly/wildfly` image?** It is a fine base, but it is only rebuilt while its WildFly version is current. Building from the release tarball on `eclipse-temurin:21-jre` means `docker compose build --pull` brings in Java 21 and Ubuntu security updates whenever Temurin publishes them, independent of the WildFly release cycle. To move to a newer WildFly, change `WILDFLY_VERSION` and `WILDFLY_SHA256` in the `Dockerfile` (and `wildfly.version` in `pom.xml`).
 
 ### Building without Compose
 

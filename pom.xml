@@ -14,77 +14,41 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- 'release' rather than source/target: it compiles against the Java 11 API
-             signatures, not just to Java 11 bytecode. Without it a JDK 17 build here
-             would happily accept an API that does not exist in Java 11 and only fail
-             in the Docker image, which builds on Temurin 11. -->
-        <maven.compiler.release>11</maven.compiler.release>
+        <!-- 'release' rather than source/target: it compiles against the Java 21 API
+             signatures, not just to Java 21 bytecode, so a newer local JDK cannot let
+             through an API that the Temurin 21 runtime image lacks. -->
+        <maven.compiler.release>21</maven.compiler.release>
         <failOnMissingWebXml>false</failOnMissingWebXml>
+
+        <!-- Keep in step with the Dockerfile's WILDFLY_VERSION. -->
+        <wildfly.version>41.0.1.Final</wildfly.version>
+        <lombok.version>1.18.48</lombok.version>
     </properties>
 
     <dependencies>
-        <!-- Java EE 8 API -->
+        <!-- Jakarta EE 11 API. WildFly provides the implementations, including
+             Hibernate ORM, Jakarta Mail and Jakarta JSON. -->
         <dependency>
-            <groupId>javax</groupId>
-            <artifactId>javaee-api</artifactId>
-            <version>8.0</version>
+            <groupId>jakarta.platform</groupId>
+            <artifactId>jakarta.jakartaee-api</artifactId>
+            <version>11.0.0</version>
             <scope>provided</scope>
         </dependency>
 
-        <!-- PrimeFaces -->
+        <!-- PrimeFaces 16 is Jakarta-only and includes the Saga theme. -->
         <dependency>
             <groupId>org.primefaces</groupId>
             <artifactId>primefaces</artifactId>
-            <version>12.0.0</version>
+            <version>16.0.0</version>
         </dependency>
 
-        <!-- PrimeFaces Themes -->
-        <dependency>
-            <groupId>org.primefaces.themes</groupId>
-            <artifactId>all-themes</artifactId>
-            <version>1.0.10</version>
-        </dependency>
-
-        <!-- Hibernate (JPA Provider) -->
-        <dependency>
-            <groupId>org.hibernate</groupId>
-            <artifactId>hibernate-core</artifactId>
-            <version>5.6.15.Final</version>
-        </dependency>
-
-        <!-- H2 Database (embedded dev mode) -->
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <version>1.4.200</version>
-        </dependency>
-
-        <!-- PostgreSQL Driver (production) -->
+        <!-- PostgreSQL driver. Not packaged in the WAR: datasources are server-level, so
+             the Docker build installs this exact version as a WildFly module. -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.6.0</version>
-        </dependency>
-
-        <!-- Apache Commons FileUpload (required by PrimeFaces file upload) -->
-        <dependency>
-            <groupId>commons-fileupload</groupId>
-            <artifactId>commons-fileupload</artifactId>
-            <version>1.5</version>
-        </dependency>
-
-        <!-- Apache Commons IO -->
-        <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-            <version>2.13.0</version>
-        </dependency>
-
-        <!-- Apache Commons Lang3 -->
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-            <version>3.13.0</version>
+            <version>42.7.13</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- JBCrypt -->
@@ -94,19 +58,11 @@
             <version>0.4</version>
         </dependency>
 
-        <!-- JavaMail API (for weekly planner email scheduler) -->
-        <dependency>
-            <groupId>com.sun.mail</groupId>
-            <artifactId>javax.mail</artifactId>
-            <version>1.6.2</version>
-            <scope>provided</scope>
-        </dependency>
-
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.30</version>
+            <version>${lombok.version}</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
@@ -116,15 +72,31 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <!-- Declared explicitly: newer JDKs no longer run annotation
+                         processors found on the plain classpath. -->
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-war-plugin</artifactId>
-                <version>3.3.2</version>
+                <version>3.4.0</version>
             </plugin>
             <plugin>
                 <groupId>org.wildfly.plugins</groupId>
                 <artifactId>wildfly-maven-plugin</artifactId>
-                <version>4.2.2.Final</version>
+                <version>5.1.5.Final</version>
                 <configuration>
-                    <version>26.1.3.Final</version>
+                    <version>${wildfly.version}</version>
                     <scripts>
                         <script>${project.basedir}/src/main/scripts/configure-ds.cli</script>
                     </scripts>
@@ -132,12 +104,4 @@
             </plugin>
         </plugins>
     </build>
-
-    <repositories>
-        <repository>
-            <id>primefaces-repo</id>
-            <name>PrimeFaces Maven Repository</name>
-            <url>https://repository.primefaces.org</url>
-        </repository>
-    </repositories>
 </project>

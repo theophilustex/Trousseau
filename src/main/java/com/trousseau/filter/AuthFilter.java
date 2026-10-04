@@ -3,17 +3,17 @@ package com.trousseau.filter;
 import com.trousseau.bean.SessionBean;
 import com.trousseau.service.UserService;
 
-import javax.inject.Inject;
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.annotation.WebFilter;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+import jakarta.inject.Inject;
+import jakarta.servlet.Filter;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.FilterConfig;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.annotation.WebFilter;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -45,7 +45,7 @@ public class AuthFilter implements Filter {
             "/reset-password.xhtml")));
 
     /** JSF resources (CSS, JS, images, PrimeFaces dynamic content). */
-    private static final String JSF_RESOURCE_PREFIX = "/javax.faces.resource/";
+    private static final String JSF_RESOURCE_PREFIX = "/jakarta.faces.resource/";
 
     /** PrimeFaces' streamed-content endpoint, which serves users' photos. */
     private static final String DYNAMIC_CONTENT_PREFIX = JSF_RESOURCE_PREFIX + "dynamiccontent";

@@ -1,6 +1,6 @@
 package com.trousseau.bean;
 
-import javax.faces.context.FacesContext;
+import jakarta.faces.context.FacesContext;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 

@@ -1,37 +1,38 @@
 # syntax=docker/dockerfile:1
 #
-# Trousseau on WildFly 26.1.3 (Java EE 8) with PostgreSQL. Usually built and run
-# through docker-compose.yml; see docs/docker.md.
+# Trousseau on WildFly 41 (Jakarta EE 11) and Java 21, with PostgreSQL. Usually
+# built and run through docker-compose.yml; see docs/docker.md.
 #
-# The runtime is Eclipse Temurin 11 plus the WildFly release tarball, rather
-# than the official WildFly 26 image: that image is no longer rebuilt and is
-# stuck on CentOS 7 and a 2022 JDK. Rebuilding this one with --pull picks up
-# current JDK 11 and OS patches.
+# The runtime is Eclipse Temurin 21 plus the WildFly release tarball, so JDK and
+# OS patches arrive with `docker compose build --pull` on Temurin's schedule,
+# independent of when a WildFly image happens to be rebuilt.
 
-ARG WILDFLY_VERSION=26.1.3.Final
-ARG WILDFLY_SHA1=b9f52ba41df890e09bb141d72947d2510caf758c
+# Keep WILDFLY_VERSION in step with pom.xml. The checksum is the SHA-256 GitHub
+# publishes for the release asset (github.com/wildfly/wildfly/releases).
+ARG WILDFLY_VERSION=41.0.1.Final
+ARG WILDFLY_SHA256=26e27908f5c720d53f24abb95f9575d04f580510e5d85fad513cda9ade8119c3
 
 # --- 1. Build the WAR ---------------------------------------------------------
-FROM maven:3.9-eclipse-temurin-11 AS build
+FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /src
 COPY pom.xml .
 COPY src ./src
 # The cache mount keeps ~/.m2 between builds without baking it into a layer.
-# The PostgreSQL driver is copied out at the version pom.xml pins, so the
-# server's driver module and the WAR's copy cannot drift apart.
+# The PostgreSQL driver is copied out at the version pom.xml pins and installed
+# as a WildFly module; the WAR itself does not carry it.
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -q package \
  && mvn -B -q dependency:copy-dependencies \
         -DincludeArtifactIds=postgresql -Dmdep.stripVersion=true -DoutputDirectory=target/jdbc
 
 # --- 2. Install and configure WildFly ----------------------------------------
-FROM eclipse-temurin:11-jre AS wildfly
+FROM eclipse-temurin:21-jre AS wildfly
 ARG WILDFLY_VERSION
-ARG WILDFLY_SHA1
+ARG WILDFLY_SHA256
 ENV JBOSS_HOME=/opt/wildfly
 RUN curl -fsSL -o /tmp/wildfly.tar.gz \
         "https://github.com/wildfly/wildfly/releases/download/${WILDFLY_VERSION}/wildfly-${WILDFLY_VERSION}.tar.gz" \
- && echo "${WILDFLY_SHA1}  /tmp/wildfly.tar.gz" | sha1sum -c - \
+ && echo "${WILDFLY_SHA256}  /tmp/wildfly.tar.gz" | sha256sum -c - \
  && mkdir -p "$JBOSS_HOME" \
  && tar -xzf /tmp/wildfly.tar.gz -C "$JBOSS_HOME" --strip-components=1 \
  && rm /tmp/wildfly.tar.gz
@@ -42,7 +43,7 @@ RUN "$JBOSS_HOME/bin/jboss-cli.sh" --file="$JBOSS_HOME/docker/configure-wildfly.
            "$JBOSS_HOME/standalone/data" "$JBOSS_HOME/standalone/log" "$JBOSS_HOME/standalone/tmp"
 
 # --- 3. Runtime ---------------------------------------------------------------
-FROM eclipse-temurin:11-jre
+FROM eclipse-temurin:21-jre
 ENV JBOSS_HOME=/opt/wildfly \
     LAUNCH_JBOSS_IN_BACKGROUND=true
 RUN groupadd --system wildfly \

@@ -2,9 +2,9 @@ package com.trousseau.bean;
 
 import com.trousseau.service.PasswordResetService;
 
-import javax.enterprise.context.RequestScoped;
-import javax.inject.Inject;
-import javax.inject.Named;
+import jakarta.enterprise.context.RequestScoped;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
 /**
  * Backs forgot-password.xhtml. The response after submitting is the same whether or not

@@ -2,9 +2,10 @@ package com.trousseau.service;
 
 import com.trousseau.model.User;
 import com.trousseau.util.AppConfig;
+import com.trousseau.util.HtmlUtil;
 
-import javax.ejb.Stateless;
-import javax.inject.Inject;
+import jakarta.ejb.Stateless;
+import jakarta.inject.Inject;
 import java.util.Optional;
 import java.util.logging.Logger;
 
@@ -67,14 +68,14 @@ public class PasswordResetService {
     }
 
     private String buildBody(User user, String link) {
-        String name = MailService.escapeHtml(user.getDisplayName() != null ? user.getDisplayName() : user.getUsername());
-        String href = MailService.escapeHtml(link);
+        String name = HtmlUtil.escape(user.getDisplayName() != null ? user.getDisplayName() : user.getUsername());
+        String href = HtmlUtil.escape(link);
         return "<!DOCTYPE html><html><head><meta charset='UTF-8'></head>"
                 + "<body style='font-family:Helvetica,Arial,sans-serif;color:#1e293b;max-width:560px;margin:0 auto;padding:24px'>"
                 + "<h2 style='color:#6366f1'>Reset your password</h2>"
                 + "<p>Hi " + name + ",</p>"
                 + "<p>Someone asked to reset the password for your Trousseau account <strong>"
-                + MailService.escapeHtml(user.getUsername()) + "</strong>. If that was you, use this link "
+                + HtmlUtil.escape(user.getUsername()) + "</strong>. If that was you, use this link "
                 + "within " + UserService.RESET_TOKEN_TTL_MINUTES + " minutes:</p>"
                 + "<p><a href='" + href + "' style='display:inline-block;background:#6366f1;color:#fff;"
                 + "padding:10px 18px;border-radius:8px;text-decoration:none'>Set a new password</a></p>"

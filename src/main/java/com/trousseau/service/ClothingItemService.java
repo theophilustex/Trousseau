@@ -9,8 +9,8 @@ import com.trousseau.model.Tag;
 import com.trousseau.model.User;
 import com.trousseau.util.ImageUtil;
 
-import javax.ejb.Stateless;
-import javax.inject.Inject;
+import jakarta.ejb.Stateless;
+import jakarta.inject.Inject;
 import java.util.Arrays;
 import java.util.List;
 

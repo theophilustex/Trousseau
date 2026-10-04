@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"
-      xmlns:h="http://xmlns.jcp.org/jsf/html"
-      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:h="jakarta.faces.html"
+      xmlns:f="jakarta.faces.core"
       xmlns:p="http://primefaces.org/ui"
-      xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
-      xmlns:c="http://xmlns.jcp.org/jsp/jstl/core">
+      xmlns:ui="jakarta.faces.facelets"
+      xmlns:c="jakarta.tags.core">
 
 <ui:composition template="/templates/layout.xhtml">
     <ui:define name="title">My Wardrobe</ui:define>
@@ -260,8 +260,10 @@
                         <label>Image</label>
                         <p:fileUpload value="#{wardrobeBean.uploadedFile}"
                                     mode="simple" skinSimple="true"
-                                    allowTypes="/(\.|\/)(gif|jpe?g|png|webp)$/i"
-                                    styleClass="form-input" />
+                                    accept="image/gif,image/jpeg,image/png,image/webp"
+                                    styleClass="form-input">
+                            <p:validateFile allowTypes="/(\.|\/)(gif|jpe?g|png|webp)$/i" />
+                        </p:fileUpload>
                     </div>
 
                     <div class="form-actions">

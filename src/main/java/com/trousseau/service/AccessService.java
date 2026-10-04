@@ -4,8 +4,8 @@ import com.trousseau.dao.ClothingItemDao;
 import com.trousseau.dao.OutfitDao;
 import com.trousseau.model.User;
 
-import javax.ejb.Stateless;
-import javax.inject.Inject;
+import jakarta.ejb.Stateless;
+import jakarta.inject.Inject;
 
 /**
  * The one place that decides who may see or change an item or outfit.

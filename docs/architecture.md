@@ -1,6 +1,6 @@
 # Architecture
 
-Trousseau is a classic server-rendered Java EE 8 application: one WAR, JSF pages backed by CDI beans, a layer of stateless EJB services, and JPA DAOs over a single relational database.
+Trousseau is a classic server-rendered Jakarta EE 11 application on WildFly 41 and Java 21: one WAR, Jakarta Faces pages (PrimeFaces 16) backed by CDI beans, a layer of stateless enterprise beans, and Jakarta Persistence DAOs (Hibernate ORM 7, provided by WildFly) over a single relational database.
 
 - [Layers](#layers)
 - [Packages](#packages)
@@ -27,7 +27,7 @@ flowchart TD
     Services --> DAOs["DAOs<br/>com.trousseau.dao<br/>@ApplicationScoped + EntityManager"]
     Services --> Weather["WeatherService<br/>@Singleton"] -->|HTTPS| OpenMeteo[(Open-Meteo)]
     Scheduler -->|JavaMail| SMTP[(SMTP)]
-    DAOs -->|JPA / Hibernate 5.6| DB[(H2 or PostgreSQL<br/>java:comp/DefaultDataSource)]
+    DAOs -->|Jakarta Persistence / Hibernate 7| DB[(H2 or PostgreSQL<br/>java:comp/DefaultDataSource)]
 ```
 
 | Layer | Responsibility | Rules |
@@ -59,9 +59,9 @@ The full entity model is in [Data model](data-model.md).
 
 ## Request lifecycle
 
-1. **`AuthFilter`** (`@WebFilter("*.xhtml")`) lets the request through if its servlet path is one of the public pages (`index`, `login`, `register`, `forgot-password`, `reset-password`) or a JSF resource, or if the session has the `com.trousseau.loggedIn` attribute set. Otherwise it redirects to `/login.xhtml`. It compares exact, container-normalised servlet paths, never substrings of the raw URI. For signed-in sessions it also checks the credentials version, so sessions end after a password change elsewhere.
-2. **`PrimeFaces FileUpload Filter`** (from `web.xml`) parses multipart bodies for `<p:fileUpload>`.
-3. **`FacesServlet`** (mapped to `*.xhtml`) runs the JSF lifecycle. View-scoped beans are created on first access and their `@PostConstruct` loads the page data.
+1. **`AuthFilter`** (`@WebFilter("*.xhtml")`) lets the request through if its servlet path is one of the public pages (`index`, `login`, `register`, `forgot-password`, `reset-password`) or a Faces resource (`/jakarta.faces.resource/…`), or if the session has the `com.trousseau.loggedIn` attribute set. Otherwise it redirects to `/login.xhtml`. It compares exact, container-normalised servlet paths, never substrings of the raw URI. For signed-in sessions it also checks the credentials version, so sessions end after a password change elsewhere.
+2. **`FacesServlet`** (mapped to `*.xhtml`, with a `<multipart-config>`) runs the Faces lifecycle. File uploads use the servlet container's own multipart parsing (`primefaces.UPLOADER=native`); `<p:validateFile>` checks file names and sizes on the server.
+3. View-scoped beans are created on first access, and their `@PostConstruct` loads the page data.
 4. Pages that take an id (`clothing-detail.xhtml?id=…`, `outfit-detail.xhtml?id=…`) bind it with `<f:viewParam>` and load with a `preRenderView` event listener (`loadItem()` / `loadOutfit()`). The listener asks `AccessService` first and ends the request with 404 (`PageResponses.notFound()`) if the user may not see the object.
 5. Actions are mostly AJAX `p:commandButton`s. They call a bean method, which calls a service, adds a `FacesMessage` and refreshes the bean's lists. The page shows messages through the `<p:growl id="growl">` in the layout.
 
@@ -162,9 +162,11 @@ These explain code that might otherwise look odd.
 
 **Never load BLOBs in list or aggregate queries.** `ClothingItem` holds the photo, thumbnail and receipt as `@Lob @Basic(fetch = LAZY)` columns. Pickers use `ClothingItemSummary` (id, name, category). Insights use `ItemWearStat` / `CategoryWearStat` / `OutfitWearStat` built with JPQL `SELECT NEW …`. BLOB bytes are fetched one column at a time with `SELECT c.imageData FROM ClothingItem c WHERE c.id = :id`. Without this, an insights page over a large wardrobe would pull every photo into memory.
 
+> ⚠️ **Only partly true today.** `fetch = LAZY` on a basic attribute is honoured only with Hibernate bytecode enhancement, which this build does not use. So any query returning `ClothingItem` entities loads all three BLOBs. The wardrobe, outfit and planner pages do this, and their view-scoped beans keep the results, which makes memory grow by tens of megabytes per session. See [Development → Known bugs](development.md#known-bugs), #1.
+
 **Thumbnails are stored, not computed per request.** A wardrobe page with 50 items would otherwise send 50 full-size photos to draw 200 px tiles. See [How it works → Photos](how-it-works.md#photos-and-thumbnails).
 
-**Database-portable queries.** The same WAR runs on H2 and PostgreSQL, with no `hibernate.dialect` set. Anything whose SQL differs between them is done in Java: monthly bucketing of wear dates in `InsightsService.getRecentActivity()`, and the `max(wearCount, 1)` in cost-per-wear ranking.
+**Specification-compliant, database-portable queries.** WildFly runs Hibernate in strict Jakarta Persistence compliance mode, so JPQL must stay within the specification (no alias on a fetch join, for example). The same WAR runs on H2 and PostgreSQL, with no `hibernate.dialect` set. Anything whose SQL differs between them is done in Java: monthly bucketing of wear dates in `InsightsService.getRecentActivity()`, and the `max(wearCount, 1)` in cost-per-wear ranking.
 
 **Columns added after first release are nullable, with null-safe getters.** `hbm2ddl=update` adds new columns as `NULL` on existing rows. `ClothingItem.status` and `wearsSinceWash` are therefore boxed types with getters that map `NULL` to `ACTIVE` / `0`, and "in rotation" queries read `status IS NULL OR status = ACTIVE`.
 

@@ -6,12 +6,13 @@ import com.trousseau.model.User;
 import com.trousseau.service.MailService;
 import com.trousseau.service.UserService;
 import com.trousseau.service.WeeklyPlannerService;
+import com.trousseau.util.HtmlUtil;
 
-import javax.ejb.Schedule;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
-import javax.inject.Inject;
-import javax.mail.MessagingException;
+import jakarta.ejb.Schedule;
+import jakarta.ejb.Singleton;
+import jakarta.ejb.Startup;
+import jakarta.inject.Inject;
+import jakarta.mail.MessagingException;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -160,6 +161,6 @@ public class WeeklyPlannerEmailScheduler {
     }
 
     private String escapeHtml(String s) {
-        return MailService.escapeHtml(s);
+        return HtmlUtil.escape(s);
     }
 }

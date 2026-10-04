@@ -4,8 +4,8 @@ import com.trousseau.dao.UserDao;
 import com.trousseau.model.User;
 import com.trousseau.util.PasswordUtil;
 
-import javax.ejb.Stateless;
-import javax.inject.Inject;
+import jakarta.ejb.Stateless;
+import jakarta.inject.Inject;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;

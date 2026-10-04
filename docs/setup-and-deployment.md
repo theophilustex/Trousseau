@@ -23,10 +23,10 @@ This guide covers running Trousseau locally, deploying it to a WildFly server, a
 
 | Component | Version | Notes |
 |---|---|---|
-| JDK | 11 or 17 to run WildFly 26; 11+ to build | The build targets Java 11 with `maven.compiler.release=11`, so a newer JDK cannot accidentally pull in post-11 APIs. |
+| JDK | 21 or newer (a full JDK, with `javac`, to build) | The build targets Java 21 with `maven.compiler.release=21`, so a newer JDK cannot accidentally pull in post-21 APIs. WildFly 41 runs on Java 21 and 25. |
 | Maven | 3.6+ | |
-| Application server | WildFly 26.1.x (Java EE 8) | Other Java EE 8 servers would need equivalents of `jboss-deployment-structure.xml` and the WildFly mail and datasource setup. |
-| Database | H2 (bundled with WildFly) or PostgreSQL | Any database Hibernate 5.6 supports should work. Only H2 and PostgreSQL are considered in the code. |
+| Application server | WildFly 41.0.x (Jakarta EE 11) | WildFly provides Hibernate ORM 7, Jakarta Mail and Jakarta JSON; the WAR carries only PrimeFaces and jBCrypt. Another Jakarta EE 11 server would need equivalents of the WildFly mail and datasource setup. |
+| Database | H2 2.x (bundled with WildFly) or PostgreSQL | Any database Hibernate 7 supports should work. Only H2 and PostgreSQL are considered in the code. |
 
 Network access is **not** required at runtime. The app makes only these optional external connections:
 
@@ -44,7 +44,7 @@ mvn clean package wildfly:run
 
 The `wildfly-maven-plugin` then:
 
-1. Downloads and unpacks **WildFly 26.1.3.Final** into `target/` (first run only, ~200 MB).
+1. Downloads and provisions **WildFly 41.0.1.Final** into `target/server` (first run after a `clean`, ~270 MB).
 2. Runs [`src/main/scripts/configure-ds.cli`](../src/main/scripts/configure-ds.cli). This repoints WildFly's built-in `ExampleDS` datasource from an in-memory H2 database to a file:
    ```
    jdbc:h2:file:~/.trousseau/trousseau;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1
@@ -63,6 +63,8 @@ On first start Hibernate creates all tables. No seed data is loaded, so register
 | See SQL | Set `hibernate.show_sql` to `true` in `persistence.xml`. |
 
 > `mvn clean` deletes `target/`, including the downloaded WildFly, so the next run downloads it again. Your data in `~/.trousseau/` is not affected.
+
+> **Upgrading from the Java EE 8 version?** Run `mvn clean` once. A `target/` left over from the old build still holds a deleted `jboss-deployment-structure.xml`, which hides WildFly's Hibernate from the app, and deployment fails with `ClassNotFoundException: org.hibernate.proxy.HibernateProxy`. Also, WildFly 41's H2 2.x cannot open database files written by the H2 1.4 in WildFly 26. Export your data from the old version (**Data → Download Export**) before upgrading, then import it into the new one.
 
 ---
 
@@ -94,9 +96,9 @@ WildFly's HTTP listener rejects requests over **10 MB** by default. That is belo
 
 The context path comes from the WAR name: `trousseau.war` is served at `/trousseau`. To serve the app at `/`, deploy it as `ROOT.war`, or set `<context-root>` in a `jboss-web.xml`.
 
-### Why the WAR bundles Hibernate
+### Hibernate comes from WildFly
 
-[`jboss-deployment-structure.xml`](../src/main/webapp/WEB-INF/jboss-deployment-structure.xml) excludes WildFly's own Hibernate, Hibernate Validator and ANTLR modules. Hibernate 5.6.15 ships inside the WAR instead, so the ORM version is set by `pom.xml` and not by the server. Keep that in mind when upgrading either one.
+The WAR does not bundle Hibernate; it uses the version WildFly 41 provides (ORM 7.4). Upgrading WildFly therefore upgrades Hibernate too. WildFly runs Hibernate in strict Jakarta Persistence compliance mode, so JPQL must follow the specification. For example, an alias on a `JOIN FETCH` is rejected at deployment.
 
 ---
 
@@ -111,11 +113,11 @@ The context path comes from the WAR name: `trousseau.war` is served at `/trousse
    ```
 2. Install the driver and a datasource in WildFly, then make it the default (run in `jboss-cli.sh --connect`):
    ```
-   deploy ~/.m2/repository/org/postgresql/postgresql/42.6.0/postgresql-42.6.0.jar
+   deploy ~/.m2/repository/org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar
 
    data-source add --name=TrousseauDS \
        --jndi-name=java:jboss/datasources/TrousseauDS \
-       --driver-name=postgresql-42.6.0.jar \
+       --driver-name=postgresql-42.7.13.jar \
        --connection-url=jdbc:postgresql://db-host:5432/trousseau \
        --user-name=trousseau --password=change-me \
        --validate-on-match=true \
@@ -220,13 +222,13 @@ Trousseau has no external configuration file. Settings live in the deployment de
 
 | Setting | Where | Default | Notes |
 |---|---|---|---|
-| JSF project stage | `web.xml` → `javax.faces.PROJECT_STAGE` | `Development` | Set to **`Production`** for real deployments. Development mode shows detailed error pages and stack traces. |
+| Faces project stage | `web.xml` → `jakarta.faces.PROJECT_STAGE` | `Development` | Set to **`Production`** for real deployments. Development mode shows detailed error pages and stack traces. |
 | Session timeout | `web.xml` → `session-timeout` | 30 minutes | |
-| PrimeFaces theme | `web.xml` → `primefaces.THEME` | `saga` | Any theme in `org.primefaces.themes:all-themes` |
+| PrimeFaces theme | `web.xml` → `primefaces.THEME` | `saga` | One of the themes built into PrimeFaces 16 (e.g. `saga`, `vela`, `arya`) |
 | Datasource | `persistence.xml` → `jta-data-source` | `java:comp/DefaultDataSource` | Change to a specific JNDI name to avoid relying on the server default. |
 | Schema management | `persistence.xml` → `hibernate.hbm2ddl.auto` | `update` | See [Data model → Schema management](data-model.md#schema-management). |
 | SQL logging | `persistence.xml` → `hibernate.show_sql` | `false` | |
-| WildFly version for `wildfly:run` | `pom.xml` → plugin `<version>` | `26.1.3.Final` | |
+| WildFly version | `pom.xml` → `wildfly.version`, and `Dockerfile` → `WILDFLY_VERSION` / `WILDFLY_SHA256` | `41.0.1.Final` | Keep the two in step |
 | Public base URL | `TROUSSEAU_BASE_URL` env var or `trousseau.base-url` system property | unset (password reset off) | See [Password reset emails](#password-reset-emails) |
 | Max request size | Undertow `http-listener` → `max-post-size` | 10 MB (WildFly default) | Raise it; see [Raise the upload limit](#raise-the-upload-limit). The Docker image defaults to 256 MB. |
 
@@ -275,3 +277,9 @@ Users can also take their own backups with **Data → Download Export**. This is
 The entities are written so that rows from older versions still load after new columns are added. For example, a `NULL` `status` reads as `ACTIVE` and a `NULL` `wears_since_wash` reads as 0. Thumbnails for photos uploaded before thumbnails existed are generated the first time each one is displayed.
 
 `hbm2ddl=update` cannot rename or drop columns, change types or migrate data. A release that needs any of those must ship a manual SQL migration.
+
+### From the Java EE 8 version (WildFly 26) to Jakarta EE 11 (WildFly 41)
+
+- **PostgreSQL (Docker):** no action needed beyond a backup. This upgrade was tested against a database written by the old version: all users, passwords, items, photos and receipts (PostgreSQL large objects), outfits, shares, ratings, comments, wear logs and planned weeks read back correctly. Hibernate 7 adds one constraint, `UNIQUE (outfit_id, season)` on `outfit_seasons`, which existing data already satisfies. Everyone is signed out once.
+- **H2:** the file format changed between H2 1.4 and 2.x. Export before upgrading and import afterwards (see above).
+- **Builds:** run `mvn clean` once (see above).

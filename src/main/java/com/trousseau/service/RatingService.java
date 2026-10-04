@@ -6,8 +6,8 @@ import com.trousseau.model.Rating;
 import com.trousseau.model.RatingType;
 import com.trousseau.model.User;
 
-import javax.ejb.Stateless;
-import javax.inject.Inject;
+import jakarta.ejb.Stateless;
+import jakarta.inject.Inject;
 import java.util.List;
 
 @Stateless

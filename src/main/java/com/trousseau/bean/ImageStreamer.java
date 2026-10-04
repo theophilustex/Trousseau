@@ -5,10 +5,10 @@ import com.trousseau.service.AccessService;
 import com.trousseau.service.ClothingItemService;
 import com.trousseau.util.ImageUtil;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.faces.context.FacesContext;
-import javax.inject.Inject;
-import javax.inject.Named;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.faces.context.FacesContext;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import java.io.ByteArrayInputStream;
 
 import org.primefaces.model.DefaultStreamedContent;
@@ -80,7 +80,7 @@ public class ImageStreamer {
      */
     private Long requestedItemId() {
         FacesContext context = FacesContext.getCurrentInstance();
-        if (context == null || context.getCurrentPhaseId() == javax.faces.event.PhaseId.RENDER_RESPONSE) {
+        if (context == null || context.getCurrentPhaseId() == jakarta.faces.event.PhaseId.RENDER_RESPONSE) {
             return null;
         }
         String param = context.getExternalContext().getRequestParameterMap().get("itemId");

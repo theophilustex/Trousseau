@@ -6,10 +6,10 @@ import com.trousseau.dao.OutfitWearLogDao;
 import com.trousseau.dao.TagDao;
 import com.trousseau.model.*;
 
-import javax.ejb.Stateless;
-import javax.inject.Inject;
-import javax.json.*;
-import javax.json.stream.JsonGenerator;
+import jakarta.ejb.Stateless;
+import jakarta.inject.Inject;
+import jakarta.json.*;
+import jakarta.json.stream.JsonGenerator;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.math.BigDecimal;
@@ -23,6 +23,15 @@ public class DataExportImportService {
 
     private static final Logger LOG = Logger.getLogger(DataExportImportService.class.getName());
     private static final String VERSION = "3";
+
+    /**
+     * Parsson, WildFly's JSON implementation, stops reading after 15 million characters
+     * by default. An export embeds every photo and receipt as base64, so an ordinary
+     * wardrobe goes far past that. The limit is lifted for imports only; their size is
+     * already capped by the HTTP request limit (MAX_UPLOAD_BYTES / max-post-size).
+     */
+    private static final Map<String, ?> IMPORT_READER_CONFIG =
+            Map.of("org.eclipse.parsson.maxParsingLimit", Integer.MAX_VALUE);
 
     @Inject private ClothingItemService clothingItemService;
     @Inject private ClothingItemDao clothingItemDao;
@@ -163,7 +172,7 @@ public class DataExportImportService {
     /** Returns a summary message of what was imported. */
     public String importUserData(User user, String json) {
         JsonObject root;
-        try (JsonReader jr = Json.createReader(new StringReader(json))) {
+        try (JsonReader jr = Json.createReaderFactory(IMPORT_READER_CONFIG).createReader(new StringReader(json))) {
             root = jr.readObject();
         }
 

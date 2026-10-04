@@ -9,8 +9,8 @@ import com.trousseau.model.MonthlyWearStat;
 import com.trousseau.model.OutfitWearStat;
 import com.trousseau.model.User;
 
-import javax.ejb.Stateless;
-import javax.inject.Inject;
+import jakarta.ejb.Stateless;
+import jakarta.inject.Inject;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
