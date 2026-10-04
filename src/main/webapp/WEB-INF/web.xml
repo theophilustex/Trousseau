@@ -13,6 +13,12 @@
         <param-value>Development</param-value>
     </context-param>
 
+    <!-- Keep XHTML comments out of the HTML sent to browsers -->
+    <context-param>
+        <param-name>javax.faces.FACELETS_SKIP_COMMENTS</param-name>
+        <param-value>true</param-value>
+    </context-param>
+
     <!-- PrimeFaces Theme -->
     <context-param>
         <param-name>primefaces.THEME</param-name>

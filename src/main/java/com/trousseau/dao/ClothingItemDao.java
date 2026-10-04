@@ -90,6 +90,34 @@ public class ClothingItemDao {
         em.remove(em.merge(item));
     }
 
+    // -------------------------------------------------------------------------
+    // Access checks (used by AccessService)
+    // -------------------------------------------------------------------------
+
+    public boolean isOwnedBy(Long id, User user) {
+        return em.createQuery(
+                "SELECT COUNT(c) FROM ClothingItem c WHERE c.id = :id AND c.owner = :user", Long.class)
+                .setParameter("id", id)
+                .setParameter("user", user)
+                .getSingleResult() > 0;
+    }
+
+    /**
+     * Owner, or shared with the user directly, or part of an outfit shared with the
+     * user (so a shared outfit's item photos render for the recipient). One query,
+     * because the image endpoint runs this for every thumbnail on a page.
+     */
+    public boolean isVisibleTo(Long id, User user) {
+        return em.createQuery(
+                "SELECT COUNT(c) FROM ClothingItem c WHERE c.id = :id AND (c.owner = :user "
+                        + "OR EXISTS (SELECT s FROM Share s WHERE s.clothingItem = c AND s.sharedWith = :user) "
+                        + "OR EXISTS (SELECT s FROM Share s JOIN s.outfit o JOIN o.items i "
+                        + "WHERE i = c AND s.sharedWith = :user))", Long.class)
+                .setParameter("id", id)
+                .setParameter("user", user)
+                .getSingleResult() > 0;
+    }
+
     /** Pickers only offer items you could actually wear, so retired ones are excluded. */
     public List<ClothingItemSummary> findSummariesByOwner(User owner) {
         return em.createQuery(

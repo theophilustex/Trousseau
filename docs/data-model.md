@@ -52,8 +52,9 @@ Every entity has a `Long id` (identity-generated). Every entity except `Tag` and
 | `display_name` | varchar(100) | defaults to username on insert |
 | `latitude`, `longitude` | double | nullable; both set = weather on |
 | `location_name` | varchar(100) | display label for the location |
-| `password_reset_token` | varchar(100) | nullable; cleared after use |
+| `password_reset_token` | varchar(100) | SHA-256 hash (base64url) of the emailed token, never the token itself; nullable; cleared after use |
 | `password_reset_expires_at` | timestamp | nullable |
+| `credentials_version` | int, **nullable** | Incremented on every password change; sessions with an older value are signed out. `NULL` reads as 0. |
 | `created_at` | timestamp | |
 
 Named queries: `findByUsername`, `findByEmail`, `findAll`, `search` (case-insensitive LIKE on username/display name, currently unused), `findByPasswordResetToken`.
@@ -207,7 +208,7 @@ The bold entries are reachable from the UI and are not cleaned up first, so thos
 
 - On first deployment, all tables, foreign keys and unique constraints are created.
 - On later deployments, **new** tables and columns are added. Nothing is ever dropped, renamed or retyped.
-- New columns are added as nullable to existing rows. Entity code must cope with `NULL` in any column added after the first release. The current examples are `ClothingItem.status` and `wears_since_wash`. Follow the same pattern (boxed type plus a null-safe getter, and `IS NULL OR …` in queries) when adding columns.
+- New columns are added as nullable to existing rows. Entity code must cope with `NULL` in any column added after the first release. The current examples are `ClothingItem.status`, `wears_since_wash` and `User.credentials_version`. Follow the same pattern (boxed type plus a null-safe getter, and `IS NULL OR …` in queries) when adding columns.
 
 There are no migration scripts and no Flyway/Liquibase. A change that needs data migration, a type change or a rename must come with a manual SQL script and a note in the release.
 

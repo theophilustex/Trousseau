@@ -45,6 +45,21 @@ Facelets pages are re-read in `Development` project stage, but Java changes need
 - **DAOs** are `@ApplicationScoped`, hold an `@PersistenceContext EntityManager`, and contain only queries and persist/merge/remove.
 - **Entity behaviour** that is purely about the entity's own fields belongs on the entity (`ClothingItem.recordWear()`, `markWashed()`, `retire()`, `getCostPerWear()`).
 
+### Access checks
+
+Anything that loads a single item or outfit from a request parameter must ask **`AccessService`** before using it. Ids are sequential, so an unchecked `findById(param)` lets any user read or change anyone's data.
+
+- On a detail page, check in the `preRenderView` listener and call `PageResponses.notFound()` when it fails, as `ClothingDetailBean.loadItem()` does. Use 404 both for "doesn't exist" and "not yours".
+- Hide owner-only controls with `rendered="#{bean.owner}"`, **and** re-check ownership at the top of each action (`refuseUnlessOwner()`). JSF won't invoke an unrendered component, but the second check means a rendering mistake can't become a hole.
+- Endpoints that stream data (photos, receipts, exports) need the same check. They are easy to forget because they aren't pages.
+- List pages are safe as long as their queries filter on the current user.
+
+### The session's user is read-only
+
+`SessionBean.getCurrentUser()` is a snapshot from login. Use it to read and to pass as the owner in queries, but **never merge it or pass it to a save**. Its fields can be stale, and merging writes every one of them back. To change the account, call an id-based `UserService` method that loads the entity fresh and sets only the fields being changed, then `sessionBean.refresh(result)`.
+
+A password change must go through `User.changePasswordHash()`, which bumps the credentials version so `AuthFilter` signs out other sessions.
+
 ### Working with photos and BLOBs
 
 - Attach photos only through `ClothingItemService.attachImage()`, so that a thumbnail is always generated.
@@ -98,7 +113,8 @@ See [Data model → Schema management](data-model.md#schema-management).
    ```
 2. Create `bean/MyPageBean.java`: `@Named @ViewScoped implements Serializable`, inject `SessionBean` and the services you need, load data in `@PostConstruct`.
 3. Add a nav link in `templates/layout.xhtml` inside the `sessionBean.loggedIn` fragment.
-4. `AuthFilter` protects the page automatically. Add it to the filter's public list only if it must be reachable when signed out.
+4. `AuthFilter` protects the page automatically. Add it to `AuthFilter.PUBLIC_PAGES` only if it must be reachable when signed out.
+5. If the page loads anything by id from the URL, follow [Access checks](#access-checks).
 
 ### Add an entity
 
@@ -142,19 +158,19 @@ Functional issues in the current code. Security issues are listed separately in 
 
 | # | Area | Problem | Suggested fix |
 |---|---|---|---|
-| 1 | Auth | `forgot-password.xhtml` and `reset-password.xhtml` are not in `AuthFilter`'s public list, so signed-out users are redirected to login and can't reset a password. | Fix the reset flow's [security issue](security.md#1-password-reset-allows-account-takeover-high) **first**, then whitelist both pages. |
-| 2 | Items | Deleting an item that belongs to any outfit or has been shared fails with a foreign-key violation (`outfit_items`, `share`). The user sees an error page. | In `ClothingItemService.delete()`, remove the item from outfits and delete its shares before removing it. Or block the delete with a friendly message suggesting Retire. |
-| 3 | Outfits | Deleting an outfit that has wear logs, planned days or shares fails the same way (`outfit_wear_log`, `planned_outfit`, `share`). Most outfits end up planned once the planner has been opened. | Delete `planned_outfit` and `share` rows first. Decide whether wear logs are deleted or the outfit is soft-deleted. |
-| 4 | Items | Name, category, colour, brand, size, description and wash threshold can't be edited after creation. `WardrobeBean.updateItem()` exists but no page uses it. | Add an edit form to `clothing-detail.xhtml`. |
-| 5 | Wardrobe | No tag filter in the UI, although `WardrobeBean.filterByTag()` exists. | Add a tag `selectOneMenu` using `tagConverter`. |
-| 6 | Wear tracking | Recording an outfit wear for a past date sets each item's `lastWornDate` to today. | Pass the date through `ClothingItemService.recordWear(item, date)` and keep the later of the two dates. |
-| 7 | Performance | `outfit-detail.xhtml` uses `#{imageStreamer.image}` (full size) for item tiles. | Switch to `#{imageStreamer.thumbnail}`. |
-| 8 | Performance | The signed-in home page builds `WardrobeBean` and `OutfitListBean` just to show three counts, loading every item with its tags. | Use `InsightsService` counts. |
-| 9 | Planner | The same outfit can be planned on several days of one week, and outfits that contain retired items are still suggested. | Penalise outfits already chosen this week; filter out outfits with retired items. |
-| 10 | Ratings | The outfit list's stars (mean of all ratings, truncated) can disagree with the detail page's Overall Average (mean of per-type averages). | Use one definition in both places. |
-| 11 | Seasons | The Winter range ends on 28 Feb, so 29 Feb wears in leap years are not counted in seasonal stats. | Use `YearMonth.of(year, 2).atEndOfMonth()`. |
-| 12 | i18n | `messages.properties` is registered as `#{msg}` in `faces-config.xml`, but no page uses it. All UI text is hard-coded in the XHTML. | Move strings to the bundle, or delete it. |
-| 13 | Uploads | Outside Docker, WildFly's default 10 MB request limit rejects bulk-add photos over 10 MB (the page allows 20 MB) and most data imports. | Documented in [Setup → Raise the upload limit](setup-and-deployment.md#raise-the-upload-limit); the Docker image sets 256 MB. |
+| 1 | Items | Deleting an item that belongs to any outfit or has been shared fails with a foreign-key violation (`outfit_items`, `share`). The user sees an error page. | In `ClothingItemService.delete()`, remove the item from outfits and delete its shares before removing it. Or block the delete with a friendly message suggesting Retire. |
+| 2 | Outfits | Deleting an outfit that has wear logs, planned days or shares fails the same way (`outfit_wear_log`, `planned_outfit`, `share`). Most outfits end up planned once the planner has been opened. | Delete `planned_outfit` and `share` rows first. Decide whether wear logs are deleted or the outfit is soft-deleted. |
+| 3 | Items | Name, category, colour, brand, size, description and wash threshold can't be edited after creation. `WardrobeBean.updateItem()` exists but no page uses it. | Add an edit form to `clothing-detail.xhtml`. |
+| 4 | Wardrobe | No tag filter in the UI, although `WardrobeBean.filterByTag()` exists. | Add a tag `selectOneMenu` using `tagConverter`. |
+| 5 | Wear tracking | Recording an outfit wear for a past date sets each item's `lastWornDate` to today. | Pass the date through `ClothingItemService.recordWear(item, date)` and keep the later of the two dates. |
+| 6 | Performance | `outfit-detail.xhtml` uses `#{imageStreamer.image}` (full size) for item tiles. | Switch to `#{imageStreamer.thumbnail}`. |
+| 7 | Performance | The signed-in home page builds `WardrobeBean` and `OutfitListBean` just to show three counts, loading every item with its tags. | Use `InsightsService` counts. |
+| 8 | Planner | The same outfit can be planned on several days of one week, and outfits that contain retired items are still suggested. | Penalise outfits already chosen this week; filter out outfits with retired items. |
+| 9 | Ratings | The outfit list's stars (mean of all ratings, truncated) can disagree with the detail page's Overall Average (mean of per-type averages). | Use one definition in both places. |
+| 10 | Seasons | The Winter range ends on 28 Feb, so 29 Feb wears in leap years are not counted in seasonal stats. | Use `YearMonth.of(year, 2).atEndOfMonth()`. |
+| 11 | i18n | `messages.properties` is registered as `#{msg}` in `faces-config.xml`, but no page uses it. All UI text is hard-coded in the XHTML. | Move strings to the bundle, or delete it. |
+| 12 | Uploads | Outside Docker, WildFly's default 10 MB request limit rejects bulk-add photos over 10 MB (the page allows 20 MB) and most data imports. | Documented in [Setup → Raise the upload limit](setup-and-deployment.md#raise-the-upload-limit); the Docker image sets 256 MB. |
+| 13 | Errors | Business-rule failures thrown as `IllegalArgumentException` from `@Stateless` services reach beans wrapped in `EJBException`, so the beans' `catch (IllegalArgumentException)` never matches and the user gets an HTTP 500 with a stack trace. Affects registering a taken username or email, sharing something twice, and creating a duplicate tag. Sharing with yourself is also allowed. | Throw an exception class annotated `@ApplicationException(rollback = true)`, which EJB passes through unwrapped, and catch that. Reject sharing with your own username. |
 | 14 | Images | When a photo is too small to need a thumbnail, `ImageStreamer.getThumbnail()` serves the original but always labels it `image/jpeg`, even for PNG/GIF/WebP. Browsers sniff and render it anyway. | Return the item's stored content type when serving the original. |
 
 ---

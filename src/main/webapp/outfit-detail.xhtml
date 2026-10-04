@@ -29,8 +29,12 @@
                             </span>
                         </div>
                     </div>
-                    <h:link outcome="/outfits" styleClass="btn btn-outline btn-sm">
+                    <h:link outcome="/outfits" styleClass="btn btn-outline btn-sm" rendered="#{outfitDetailBean.owner}">
                         <i class="pi pi-arrow-left"></i> Back to Outfits
+                    </h:link>
+                    <h:link outcome="/shared" styleClass="btn btn-outline btn-sm"
+                            rendered="#{not outfitDetailBean.owner}">
+                        <i class="pi pi-arrow-left"></i> Back to Shared
                     </h:link>
                 </div>
 
@@ -98,7 +102,8 @@
                         </div>
                     </div>
 
-                    <div class="record-wear-form">
+                    <!-- Recording a wear advances the owner's item counters: owner only -->
+                    <h:panelGroup layout="block" styleClass="record-wear-form" rendered="#{outfitDetailBean.owner}">
                         <label class="field-label">Date Worn</label>
                         <p:datePicker value="#{outfitDetailBean.wearDate}"
                                      pattern="yyyy-MM-dd"
@@ -107,7 +112,7 @@
                                        action="#{outfitDetailBean.recordWear()}"
                                        update="@form :growl"
                                        styleClass="btn btn-primary" />
-                    </div>
+                    </h:panelGroup>
 
                     <div class="wear-log-list" rendered="#{not empty outfitDetailBean.recentWearLogs}">
                         <h4 class="wear-log-heading">Recent Wear History</h4>
@@ -197,8 +202,8 @@
                     </div>
                 </p:panel>
 
-                <!-- Share Section -->
-                <p:panel header="Share Outfit" styleClass="detail-panel">
+                <!-- Share Section (owner only) -->
+                <p:panel header="Share Outfit" styleClass="detail-panel" rendered="#{outfitDetailBean.owner}">
                     <div class="share-form">
                         <p:inputText value="#{outfitDetailBean.shareUsername}"
                                    placeholder="Enter username to share with..."

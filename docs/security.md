@@ -2,11 +2,13 @@
 
 This page describes how Trousseau handles authentication and access control, lists known security issues in the current code, and gives a hardening checklist for anyone running an instance.
 
-> **Summary.** Trousseau is currently suitable for a **trusted group** (a household, or friends on a private network). It is not ready for open registration on the public internet until the [known issues](#known-issues) marked *High* are fixed.
+> **Summary.** The serious issues found so far (an authentication bypass, password-reset account takeover, missing ownership checks, and stale sessions undoing password changes) are [fixed](#fixed-issues). Trousseau is suitable for a household or a group of friends. Before opening registration to the public internet, work through the [remaining issues](#known-issues) and the [hardening checklist](#hardening-checklist).
 
 - [Authentication](#authentication)
+- [Password reset](#password-reset)
 - [Authorization model](#authorization-model)
 - [Known issues](#known-issues)
+- [Fixed issues](#fixed-issues)
 - [Other considerations](#other-considerations)
 - [Hardening checklist](#hardening-checklist)
 
@@ -23,25 +25,59 @@ This page describes how Trousseau handles authentication and access control, lis
 | Session | Servlet `HttpSession`, 30-minute idle timeout. `SessionBean` holds the `User`; `AuthFilter` checks the `com.trousseau.loggedIn` attribute. |
 | Logout | Invalidates the session |
 | Session ID on login | Not rotated (`HttpServletRequest.changeSessionId()` is not called) |
+| Password change / reset | Signs out every **other** session on its next request. The session that changed the password stays signed in. See [Sessions and password changes](#sessions-and-password-changes). |
 | CSRF | JSF postbacks require a valid `javax.faces.ViewState`, which gives some protection for form actions. No explicit CSRF tokens or `<protected-views>`. |
-| Password reset | 32-byte `SecureRandom` token, base64url, valid 60 minutes, single use, stored in plain text in `app_user.password_reset_token` |
+
+`AuthFilter` lets signed-out visitors reach exactly these pages: `index`, `login`, `register`, `forgot-password` and `reset-password`, plus JSF resources (`/javax.faces.resource/…`). Everything else redirects to login. It matches on the container-normalised **servlet path**, never on the raw request URI (see [fixed issue A](#fixed-issues)).
+
+## Sessions and password changes
+
+Each account has a **credentials version** (`app_user.credentials_version`) that goes up whenever the password changes, by Profile or by reset link. At login, the session records the account's id and current version. On every signed-in page and photo request, `AuthFilter` compares the recorded version with the database (a one-column primary-key read), and invalidates the session if they differ. The session that made a Profile password change records the new version straight away, so it stays signed in.
+
+`SessionBean.currentUser` is a snapshot taken at login. It is used for reading and as the owner in queries, and is **never merged back** into the database. Profile, location and password changes load the account fresh by id and set only the fields being changed (`UserService.updateProfile`, `updateLocation`, `changePassword`). Before this fix, a profile save in an old session restored the password from before a reset.
+
+## Password reset
+
+Implemented in `PasswordResetService`, `UserService` and `ForgotPasswordBean`.
+
+1. A visitor enters a username or email on **Forgot your password?**
+2. If it matches an account **that has an email address**, a single-use link is emailed to that address. The link is never shown on screen.
+3. The page shows the same message whether or not anything matched, so it can't be used to find out which accounts exist. The email is sent in the background, so response time doesn't give it away either.
+
+| Aspect | Implementation |
+|---|---|
+| Token | 32 bytes from `SecureRandom`, base64url-encoded |
+| Storage | Only the token's **SHA-256 hash** is stored (`app_user.password_reset_token`), so a copy of the database contains no working links |
+| Lifetime | 60 minutes, single use; cleared whenever the password changes |
+| After use | Signs out every session on the account, including any an attacker may have had |
+| Link host | Built from the configured **`TROUSSEAU_BASE_URL`**, never from the request's `Host` header, which the client controls. If it is unset, the feature is switched off and the page says so. |
+| Throttle | At most one email per account every 2 minutes |
+| Accounts without an email | Cannot reset themselves. Whoever runs the server must help. |
 
 ## Authorization model
 
-There are no roles. `AuthFilter` only decides whether a request is **authenticated**. It lets everyone through to `index`, `login`, `register` and static/JSF resources, and redirects all other pages to login unless the session is signed in.
+There are no roles. Two mechanisms keep users' data apart:
 
-Ownership is enforced **by query scope**, not by per-object checks. List pages (wardrobe, outfits, laundry, insights, planner, shared, export) only query rows belonging to `sessionBean.currentUser`, so users never see each other's data **in lists**.
+1. **Lists are scoped by query.** Wardrobe, outfits, laundry, insights, planner, shared and export only ever query rows belonging to `sessionBean.currentUser`.
+2. **Anything loaded by an id from the request goes through `AccessService`.** Ids are sequential and easy to guess, so this check is what stops one user from reading another's data.
 
-Pages that load a single object **by id from the URL** do not check ownership consistently:
+| Who | Item | Outfit |
+|---|---|---|
+| **Owner** | Everything | Everything |
+| **Someone it was shared with** | View photo, details, wear stats and tags. Price, receipt and lifecycle are hidden. | View, **rate and comment**. Recording wears, editing items, sharing and deleting are hidden. |
+| **Someone an outfit containing the item was shared with** | Same as a direct item share, so the outfit's photos render | — |
+| **Anyone else** | `404 Not Found`, the same as a missing id | `404 Not Found` |
 
-| Endpoint | Ownership check |
+Where it is enforced:
+
+| Endpoint | Check |
 |---|---|
-| `clothing-detail.xhtml?id=N` | **None.** Any signed-in user can view, edit, retire, tag, share, delete, and download the photo/receipt of any item. |
-| `outfit-detail.xhtml?id=N` | Edit, share and delete controls render only for the creator (`OutfitDetailBean.isOwner()`), and JSF will not invoke actions on unrendered components. Viewing, rating and commenting are open to **any** signed-in user, not just people it was shared with. |
-| `#{imageStreamer.image}` / `.thumbnail` with `itemId=N` | **None.** Any signed-in user can fetch any item's photo by id. |
-| Comment delete | Checks that the current user is the author |
+| `clothing-detail.xhtml?id=N` | `ClothingDetailBean.loadItem()` answers 404 unless `canViewItem`. Every mutating action re-checks `ownsItem`, and owner-only controls are not rendered for others. |
+| `outfit-detail.xhtml?id=N` | `OutfitDetailBean.loadOutfit()` answers 404 unless `canViewOutfit`. Owner-only actions re-check `ownsOutfit`. |
+| `#{imageStreamer.image}` / `.thumbnail` with `itemId=N` | Empty response unless `canViewItem`, including for anonymous requests |
+| Comment delete | Only the comment's author |
 
-Sharing therefore works as a way to *tell* someone about an item or outfit. It is not an access-control boundary.
+**Rule for new code:** any page or endpoint that loads a single object from a request parameter must check `AccessService` before using it. See [Development → Conventions](development.md#access-checks).
 
 ---
 
@@ -49,53 +85,46 @@ Sharing therefore works as a way to *tell* someone about an item or outfit. It i
 
 Ordered by severity.
 
-### 1. Password reset allows account takeover (High)
+### 1. Uploaded content type is trusted (Medium)
 
-`ForgotPasswordBean` displays the generated reset link **on screen to whoever requested it**. Anyone who knows (or guesses) a username or email can generate a link for that account, open it, and set a new password.
-
-The page is currently only reachable by signed-in users, because `AuthFilter` does not whitelist `forgot-password.xhtml` and `reset-password.xhtml` (see [Development → Known bugs](development.md#known-bugs)). In practice this means **any registered user can take over any other account**. If the filter is "fixed" by whitelisting those pages without fixing the flow, **anonymous visitors** can take over accounts too.
-
-**Fix:** deliver the link by email only (the app already has a mail session), always show the same generic "if the account exists, we've sent a link" response, store only a hash of the token, and only then add the two pages to the `AuthFilter` whitelist. Until then, consider removing the "Forgot your password?" link.
-
-### 2. Item pages have no ownership check (High)
-
-See the [authorization table](#authorization-model). Ids are sequential, so they are easy to enumerate. Any signed-in user can open `clothing-detail.xhtml?id=1`, `?id=2`, … to view, edit or **delete** other users' items and download their receipts.
-
-**Fix:** in `ClothingDetailBean.loadItem()`, load the item only if `item.owner == currentUser` or a `Share` exists for (item, currentUser). Make every mutating action require ownership. Apply the same rule in `ImageStreamer`.
-
-### 3. Outfits are readable by any user (Medium)
-
-`OutfitDetailBean.loadOutfit()` loads any outfit by id. Its items' photos, ratings and comments are visible, and anyone can add ratings and comments.
-
-**Fix:** allow access only to the creator or a user the outfit has been shared with.
-
-### 4. Uploaded content type is trusted (Medium)
-
-The photo's `Content-Type` and filename come from the browser and are served back unchanged by `ImageStreamer.getImage()`. Type restrictions (`allowTypes`) are declared on the PrimeFaces upload components, and receipts accept `image/*` and PDF. Nothing on the server checks that the bytes really are an image. A crafted upload could be served inline as `text/html` from the app's origin.
+The photo's `Content-Type` and filename come from the browser and are served back unchanged by `ImageStreamer.getImage()`. Type restrictions (`allowTypes`) are declared on the PrimeFaces upload components, and receipts accept `image/*` and PDF. Nothing on the server checks that the bytes really are an image. A crafted upload could be served inline as `text/html` from the app's origin, to its owner and anyone it's shared with.
 
 **Fix:** on upload, decode with `ImageIO` (already done for thumbnails) and reject files that fail. Serve photos with a fixed `image/*` type. Add an `X-Content-Type-Options: nosniff` response header.
 
-### 5. No brute-force protection (Medium)
+### 2. No brute-force protection (Medium)
 
-Unlimited login attempts. Mitigate at the reverse proxy (rate limiting, fail2ban), or add a per-account backoff in `UserService.authenticate()`.
+Unlimited login attempts. The reset form is throttled per account but not per client. Mitigate at the reverse proxy (rate limiting, fail2ban), or add per-account backoff in `UserService.authenticate()`.
 
-### 6. Session fixation (Low)
+### 3. Session fixation (Low)
 
 The session ID is not changed at login. Call `request.changeSessionId()` in `LoginBean.login()` after successful authentication.
 
-### 7. Development project stage (Low)
+### 4. Development project stage (Low)
 
 `web.xml` ships with `javax.faces.PROJECT_STAGE=Development`, which shows detailed error pages including stack traces and EL expressions. Set it to `Production`.
 
 ---
 
+## Fixed issues
+
+| | Issue | Severity | Fix |
+|---|---|---|---|
+| A | **Authentication bypass.** `AuthFilter` checked `uri.contains("/login.xhtml")` on the raw URI, so `/login.xhtml/../wardrobe.xhtml` passed the check and was then served as the wardrobe page. Combined with B, an anonymous visitor could view any item, download its receipt, and delete it. | Critical | Match exact, normalised servlet paths |
+| B | **No ownership check on items.** Any signed-in user could view, edit or delete any item via `clothing-detail.xhtml?id=N`, and fetch any photo by id. | High | `AccessService`; read-only view for share recipients; 404 otherwise |
+| C | **Password-reset account takeover.** The reset link was shown on screen to whoever asked, so anyone who knew a username could take over that account. | High | Link emailed to the account's address only; hashed tokens; base URL from config; throttle |
+| D | **Outfits readable by anyone.** Any signed-in user could view, rate and comment on any outfit. Recipients could also re-share it and record wears against the owner's items. | Medium | Visible to creator and recipients only; share and record-wear owner-only |
+| E | **A stale session could undo a password change.** Profile saves merged the user snapshot from login back into the database, restoring the old password hash after a reset. Password changes also left other sessions signed in. | Medium | Field-level updates on a fresh entity; credentials version checked by `AuthFilter` |
+
+---
+
 ## Other considerations
 
-- **Output escaping.** All dynamic text goes through JSF components, which HTML-escape by default. No `escape="false"` is used. The weekly email builds HTML by hand and escapes outfit and item names with `escapeHtml()`.
+- **Output escaping.** All dynamic text goes through JSF components, which HTML-escape by default. No `escape="false"` is used. Emails built by hand escape user-supplied text with `MailService.escapeHtml()`.
 - **SQL injection.** All queries are JPQL with bound parameters.
-- **Data at rest.** Photos, receipts and all personal data are stored unencrypted in the database. The local H2 setup uses WildFly's `ExampleDS` default credentials (`sa`/`sa`) and listens only on the local file. With `AUTO_SERVER=TRUE`, H2 also opens a TCP port bound to the local machine.
+- **HTML comments.** `FACELETS_SKIP_COMMENTS` is on, so developer comments in `.xhtml` files are not sent to browsers.
+- **Data at rest.** Photos, receipts and all personal data are stored unencrypted in the database. The local H2 setup uses WildFly's `ExampleDS` default credentials (`sa`/`sa`). With `AUTO_SERVER=TRUE`, H2 also opens a TCP port bound to the local machine.
 - **Third parties.** If a user sets a location, their coordinates are sent to Open-Meteo (`api.open-meteo.com`) by the server. Browsers fetch the Inter font from Google Fonts on every page.
-- **Email.** The weekly email lists outfit and item names in plain text, so treat it as personal data in transit through your SMTP provider.
+- **Email.** The weekly email lists outfit and item names in plain text, so treat it as personal data in transit through your SMTP provider. Reset emails carry a live credential for 60 minutes; use an SMTP connection with TLS.
 - **Cookies.** No `<cookie-config>` is set, so `Secure` is not added to the session cookie. Set it when serving over HTTPS.
 
 ---
@@ -104,8 +133,7 @@ The session ID is not changed at login. Call `request.changeSessionId()` in `Log
 
 Before exposing an instance beyond people you trust:
 
-- [ ] Fix or disable the password-reset flow ([issue 1](#1-password-reset-allows-account-takeover-high))
-- [ ] Add ownership checks to item and outfit detail pages and `ImageStreamer` ([2](#2-item-pages-have-no-ownership-check-high), [3](#3-outfits-are-readable-by-any-user-medium))
+- [ ] Set `TROUSSEAU_BASE_URL` to the public `https://` address and configure SMTP over TLS, so password reset works and its links are protected in transit
 - [ ] Serve only over **HTTPS** (TLS at a reverse proxy) and enable `proxy-address-forwarding`. In Docker, set `BEHIND_PROXY=true`; enable it only when a proxy is actually in front. See [Setup](setup-and-deployment.md#running-behind-a-reverse-proxy) and [Docker](docker.md#behind-a-reverse-proxy).
 - [ ] Add to `web.xml`:
   ```xml
@@ -119,7 +147,7 @@ Before exposing an instance beyond people you trust:
   </session-config>
   ```
 - [ ] Set `javax.faces.PROJECT_STAGE` to `Production`
-- [ ] Rate-limit `/trousseau/login.xhtml` at the proxy
+- [ ] Rate-limit `/trousseau/login.xhtml` and `/trousseau/forgot-password.xhtml` at the proxy
 - [ ] Use PostgreSQL with a dedicated, least-privilege database user and a strong password
 - [ ] Protect the WildFly management interface (port 9990): bind it to localhost or firewall it
 - [ ] Back up the database regularly ([Setup → Backups](setup-and-deployment.md#backups))

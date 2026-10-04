@@ -18,7 +18,7 @@ Requirements: Docker Engine 23+ with the Compose plugin. Java and Maven are not 
 
 ```bash
 cp .env.example .env
-# edit .env and set DB_PASSWORD (and TZ)
+# edit .env: set DB_PASSWORD, and ideally TZ and TROUSSEAU_BASE_URL
 docker compose up -d --build
 ```
 
@@ -37,6 +37,7 @@ All settings go in `.env` next to `docker-compose.yml`. `.env` is git-ignored be
 | `DB_PASSWORD` | *(required)* | PostgreSQL password. Used to create the database on first start, and by the app to connect. |
 | `DB_NAME`, `DB_USER` | `trousseau` | Database name and user |
 | `TROUSSEAU_PORT` | `8473` | Host port. The app is at `http://<host>:<port>/trousseau/`. |
+| `TROUSSEAU_BASE_URL` | *(unset)* | The address people use to reach the app, e.g. `https://wardrobe.example.com/trousseau`. Used for links in emails. **Password reset is off until this is set.** |
 | `TZ` | `UTC` | Timezone for the Sunday 17:00 email and for "today" in the app (e.g. `Europe/London`) |
 | `JAVA_MAX_HEAP` | `1g` | Maximum JVM heap. Data imports are read into memory, so raise this for large wardrobes. |
 | `MAX_UPLOAD_BYTES` | `268435456` (256 MB) | Largest accepted HTTP request. Applies to photo uploads and data imports. |
@@ -148,7 +149,9 @@ BEHIND_PROXY=true
 
 The proxy must send `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Port`. It must also allow request bodies as large as `MAX_UPLOAD_BYTES` (nginx: `client_max_body_size 256m;`).
 
-Leave `BEHIND_PROXY=false` when there is no proxy. Otherwise any client could set those headers and control the host name in password-reset links.
+Without it, WildFly builds redirects from its own view of the request, so a TLS proxy's users get bounced to `http://` addresses. Leave `BEHIND_PROXY=false` when there is no proxy. Otherwise any client could set those headers to forge its address and scheme.
+
+Set `TROUSSEAU_BASE_URL` to the public `https://` address too. Emailed links are built only from that setting, never from request headers.
 
 ---
 
@@ -190,4 +193,6 @@ Point it at any PostgreSQL server you already run.
 | Large import fails with `OutOfMemoryError` | Raise `JAVA_MAX_HEAP`. |
 | Weekly email not arriving | `docker compose logs app | grep -i "planner email"` shows the result of each run and any SMTP error. Try the [Mailpit test](#testing-email-with-mailpit). |
 | Email sent at the wrong hour | Set `TZ`. |
-| Password-reset links point at `localhost` or `http://` behind a proxy | Set `BEHIND_PROXY=true` and have the proxy send `X-Forwarded-*` headers. |
+| "Password reset isn't set up" on the forgot-password page | Set `TROUSSEAU_BASE_URL` (and SMTP) in `.env`, then `docker compose up -d`. |
+| Password-reset emails link to the wrong address | Fix `TROUSSEAU_BASE_URL`; links are built only from it. |
+| After login behind a proxy, the browser is sent to `http://` | Set `BEHIND_PROXY=true` and have the proxy send `X-Forwarded-*` headers. |

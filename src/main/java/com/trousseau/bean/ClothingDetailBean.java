@@ -4,6 +4,7 @@ import com.trousseau.model.ClothingItem;
 import com.trousseau.model.ItemStatus;
 import com.trousseau.model.Tag;
 import com.trousseau.model.User;
+import com.trousseau.service.AccessService;
 import com.trousseau.service.ClothingItemService;
 import com.trousseau.service.ShareService;
 import com.trousseau.service.TagService;
@@ -33,6 +34,9 @@ public class ClothingDetailBean implements Serializable {
     private ClothingItemService clothingItemService;
 
     @Inject
+    private AccessService accessService;
+
+    @Inject
     private TagService tagService;
 
     @Inject
@@ -49,10 +53,11 @@ public class ClothingDetailBean implements Serializable {
     private List<Tag> availableTags;
     private Long selectedTagId;
     private String shareUsername;
-    private List<User> allUsers;
     private String newTagName;
     private UploadedFile uploadedReceipt;
     private ItemStatus retireStatus = ItemStatus.ARCHIVED;
+    /** Whether the current user owns the item; everyone else gets a read-only page. */
+    private boolean owner;
     private String retireNote;
 
     @PostConstruct
@@ -60,16 +65,43 @@ public class ClothingDetailBean implements Serializable {
         // Loading happens in loadItem(), called from f:viewAction
     }
 
+    /**
+     * Loads the item named by the id parameter. Answers 404 when it does not exist or
+     * the current user may not see it (see {@link AccessService}).
+     */
     public void loadItem() {
-        if (itemId != null) {
-            item = clothingItemService.findById(itemId);
-            User currentUser = sessionBean.getCurrentUser();
+        User currentUser = sessionBean.getCurrentUser();
+        if (!accessService.canViewItem(currentUser, itemId)) {
+            item = null;
+            PageResponses.notFound();
+            return;
+        }
+        item = clothingItemService.findById(itemId);
+        owner = accessService.ownsItem(currentUser, itemId);
+        if (owner) {
             availableTags = tagService.findByOwner(currentUser);
-            allUsers = userService.findAll();
         }
     }
 
+    public boolean isOwner() {
+        return owner;
+    }
+
+    /**
+     * Owner-only controls are not rendered for anyone else, and JSF will not invoke an
+     * unrendered component, but each action checks again rather than rely on that.
+     */
+    private boolean refuseUnlessOwner() {
+        if (owner) {
+            return false;
+        }
+        FacesContext.getCurrentInstance().addMessage(null,
+                new FacesMessage(FacesMessage.SEVERITY_ERROR, "Only the owner can change this item", null));
+        return true;
+    }
+
     public void recordWear() {
+        if (refuseUnlessOwner()) return;
         clothingItemService.recordWear(item);
         item = clothingItemService.findById(itemId);
 
@@ -83,6 +115,7 @@ public class ClothingDetailBean implements Serializable {
      * wardrobe that was catalogued before the field existed.
      */
     public void savePurchaseInfo() {
+        if (refuseUnlessOwner()) return;
         item = clothingItemService.update(item);
 
         FacesContext.getCurrentInstance().addMessage(null,
@@ -94,6 +127,7 @@ public class ClothingDetailBean implements Serializable {
      * final cost per wear survive.
      */
     public void retireItem() {
+        if (refuseUnlessOwner()) return;
         clothingItemService.retire(item, retireStatus, retireNote);
         item = clothingItemService.findById(itemId);
         retireNote = null;
@@ -104,6 +138,7 @@ public class ClothingDetailBean implements Serializable {
     }
 
     public void reactivateItem() {
+        if (refuseUnlessOwner()) return;
         clothingItemService.reactivate(item);
         item = clothingItemService.findById(itemId);
 
@@ -122,6 +157,7 @@ public class ClothingDetailBean implements Serializable {
     public void setRetireNote(String retireNote) { this.retireNote = retireNote; }
 
     public void markWashed() {
+        if (refuseUnlessOwner()) return;
         clothingItemService.markWashed(item);
         item = clothingItemService.findById(itemId);
 
@@ -130,6 +166,7 @@ public class ClothingDetailBean implements Serializable {
     }
 
     public void addTag() {
+        if (refuseUnlessOwner()) return;
         if (selectedTagId != null) {
             Tag tag = tagService.findById(selectedTagId);
             if (tag != null) {
@@ -140,11 +177,13 @@ public class ClothingDetailBean implements Serializable {
     }
 
     public void removeTag(Tag tag) {
+        if (refuseUnlessOwner()) return;
         clothingItemService.removeTagFromItem(item, tag);
         item = clothingItemService.findById(itemId);
     }
 
     public void createAndAddTag() {
+        if (refuseUnlessOwner()) return;
         if (newTagName != null && !newTagName.trim().isEmpty()) {
             User currentUser = sessionBean.getCurrentUser();
             Tag tag = tagService.findOrCreate(currentUser, newTagName);
@@ -156,11 +195,13 @@ public class ClothingDetailBean implements Serializable {
     }
 
     public String deleteItem() {
+        if (refuseUnlessOwner()) return null;
         clothingItemService.delete(item);
         return "wardrobe?faces-redirect=true";
     }
 
     public void shareItem() {
+        if (refuseUnlessOwner()) return;
         if (shareUsername != null && !shareUsername.trim().isEmpty()) {
             User targetUser = userService.findByUsername(shareUsername);
             if (targetUser != null) {
@@ -177,6 +218,7 @@ public class ClothingDetailBean implements Serializable {
     }
 
     public void uploadReceipt() {
+        if (refuseUnlessOwner()) return;
         if (uploadedReceipt != null && uploadedReceipt.getContent() != null && uploadedReceipt.getContent().length > 0) {
             item = clothingItemService.saveReceipt(item,
                     uploadedReceipt.getContent(),
@@ -189,13 +231,14 @@ public class ClothingDetailBean implements Serializable {
     }
 
     public void deleteReceipt() {
+        if (refuseUnlessOwner()) return;
         item = clothingItemService.deleteReceipt(item);
         FacesContext.getCurrentInstance().addMessage(null,
                 new FacesMessage(FacesMessage.SEVERITY_INFO, "Receipt deleted", null));
     }
 
     public StreamedContent downloadReceipt() {
-        if (item != null && item.getReceiptData() != null) {
+        if (owner && item != null && item.getReceiptData() != null) {
             return DefaultStreamedContent.builder()
                     .stream(() -> new ByteArrayInputStream(clothingItemService.getReceiptData(item.getId())))
                     .contentType(item.getReceiptContentType())
@@ -264,14 +307,6 @@ public class ClothingDetailBean implements Serializable {
 
     public void setShareUsername(String shareUsername) {
         this.shareUsername = shareUsername;
-    }
-
-    public List<User> getAllUsers() {
-        return allUsers;
-    }
-
-    public void setAllUsers(List<User> allUsers) {
-        this.allUsers = allUsers;
     }
 
     public String getNewTagName() {

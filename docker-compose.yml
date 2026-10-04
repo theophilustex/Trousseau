@@ -33,6 +33,7 @@ services:
       SMTP_FROM: ${SMTP_FROM:-noreply@trousseau.app}
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-268435456}
       BEHIND_PROXY: ${BEHIND_PROXY:-false}
+      TROUSSEAU_BASE_URL: ${TROUSSEAU_BASE_URL:-}
       TZ: ${TZ:-UTC}
       JBOSS_JAVA_SIZING: >-
         -Xms128m -Xmx${JAVA_MAX_HEAP:-1g}

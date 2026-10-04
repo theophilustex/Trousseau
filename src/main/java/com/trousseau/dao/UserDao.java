@@ -68,6 +68,18 @@ public class UserDao {
                 .getResultList();
     }
 
+    /** The credentials version (NULL read as 0), or -1 when there is no such user. */
+    public int findCredentialsVersion(Long id) {
+        List<Integer> rows = em.createQuery(
+                "SELECT u.credentialsVersion FROM User u WHERE u.id = :id", Integer.class)
+                .setParameter("id", id)
+                .getResultList();
+        if (rows.isEmpty()) {
+            return -1;
+        }
+        return rows.get(0) == null ? 0 : rows.get(0);
+    }
+
     public User update(User user) {
         return em.merge(user);
     }

@@ -10,6 +10,7 @@ This guide covers running Trousseau locally, deploying it to a WildFly server, a
 - [Deploying to an existing WildFly](#deploying-to-an-existing-wildfly)
 - [Using PostgreSQL](#using-postgresql)
 - [Weekly email (SMTP)](#weekly-email-smtp)
+- [Password reset emails](#password-reset-emails)
 - [Weather forecasts](#weather-forecasts)
 - [Running behind a reverse proxy](#running-behind-a-reverse-proxy)
 - [Configuration reference](#configuration-reference)
@@ -162,6 +163,24 @@ Things to know:
 
 ---
 
+## Password reset emails
+
+**Forgot your password?** emails a single-use link, using the same mail session as the weekly email. It stays switched off, and the page says so, until the app knows its own public address. That address is never taken from the request, because the `Host` header is client-controlled and a forged one would send the victim a link to someone else's server.
+
+Set it as an environment variable of the WildFly process, or as a system property:
+
+```bash
+# environment (e.g. in the service unit, or before standalone.sh)
+export TROUSSEAU_BASE_URL=https://wardrobe.example.com/trousseau
+
+# or a system property, e.g. in standalone.conf
+JAVA_OPTS="$JAVA_OPTS -Dtrousseau.base-url=https://wardrobe.example.com/trousseau"
+```
+
+The system property wins if both are set. Users without an email address on their account cannot reset their own password. See [Security → Password reset](security.md#password-reset) for how the flow is protected.
+
+---
+
 ## Weather forecasts
 
 Weather-aware planning is per user and off by default. A user turns it on by entering coordinates in **Profile → Location**. The server then calls:
@@ -181,7 +200,7 @@ https://api.open-meteo.com/v1/forecast?latitude=…&longitude=…
 
 ## Running behind a reverse proxy
 
-Trousseau builds absolute URLs in one place: the password-reset link. It uses the request's scheme, host and port. Behind a TLS-terminating proxy, enable forwarded-header handling so the link reads `https://your-host/…` and not `http://127.0.0.1:8080/…`:
+Behind a TLS-terminating proxy, enable forwarded-header handling so the redirects WildFly sends (after login, for example) point at `https://your-host/…` and not `http://127.0.0.1:8080/…`:
 
 ```
 /subsystem=undertow/server=default-server/http-listener=default:write-attribute(name=proxy-address-forwarding,value=true)
@@ -208,6 +227,7 @@ Trousseau has no external configuration file. Settings live in the deployment de
 | Schema management | `persistence.xml` → `hibernate.hbm2ddl.auto` | `update` | See [Data model → Schema management](data-model.md#schema-management). |
 | SQL logging | `persistence.xml` → `hibernate.show_sql` | `false` | |
 | WildFly version for `wildfly:run` | `pom.xml` → plugin `<version>` | `26.1.3.Final` | |
+| Public base URL | `TROUSSEAU_BASE_URL` env var or `trousseau.base-url` system property | unset (password reset off) | See [Password reset emails](#password-reset-emails) |
 | Max request size | Undertow `http-listener` → `max-post-size` | 10 MB (WildFly default) | Raise it; see [Raise the upload limit](#raise-the-upload-limit). The Docker image defaults to 256 MB. |
 
 ### Code constants
@@ -216,6 +236,7 @@ Trousseau has no external configuration file. Settings live in the deployment de
 |---|---|---|
 | Password hash cost (bcrypt rounds) | 12 | `util/PasswordUtil` |
 | Password-reset link lifetime | 60 minutes | `UserService.RESET_TOKEN_TTL_MINUTES` |
+| Password-reset resend interval | 2 minutes per account | `PasswordResetService.RESEND_INTERVAL_MINUTES` |
 | Thumbnail longest edge | 400 px (JPEG) | `ImageUtil.THUMBNAIL_MAX_EDGE` |
 | Bulk-add queue limit | 40 photos | `BulkAddBean.MAX_DRAFTS` |
 | Bulk-add per-file size limit | 20 MB | `bulk-add.xhtml` → `sizeLimit` |

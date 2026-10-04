@@ -58,6 +58,24 @@ public class OutfitDao {
         em.remove(em.merge(outfit));
     }
 
+    public boolean isCreatedBy(Long id, User user) {
+        return em.createQuery(
+                "SELECT COUNT(o) FROM Outfit o WHERE o.id = :id AND o.creator = :user", Long.class)
+                .setParameter("id", id)
+                .setParameter("user", user)
+                .getSingleResult() > 0;
+    }
+
+    /** Creator, or shared with the user. */
+    public boolean isVisibleTo(Long id, User user) {
+        return em.createQuery(
+                "SELECT COUNT(o) FROM Outfit o WHERE o.id = :id AND (o.creator = :user "
+                        + "OR EXISTS (SELECT s FROM Share s WHERE s.outfit = o AND s.sharedWith = :user))", Long.class)
+                .setParameter("id", id)
+                .setParameter("user", user)
+                .getSingleResult() > 0;
+    }
+
     public long countByCreator(User creator) {
         return em.createQuery(
                 "SELECT COUNT(o) FROM Outfit o WHERE o.creator = :creator", Long.class)

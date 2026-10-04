@@ -6,6 +6,9 @@ import com.trousseau.util.PasswordUtil;
 
 import javax.ejb.Stateless;
 import javax.inject.Inject;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
@@ -15,7 +18,7 @@ import java.util.List;
 public class UserService {
 
     private static final int RESET_TOKEN_BYTES = 32;
-    private static final int RESET_TOKEN_TTL_MINUTES = 60;
+    static final int RESET_TOKEN_TTL_MINUTES = 60;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     @Inject
@@ -66,50 +69,108 @@ public class UserService {
         return userDao.search(term);
     }
 
-    public User updateProfile(User user) {
-        return userDao.update(user);
+    // --- account changes ------------------------------------------------------
+    //
+    // These take an id and change only the named fields on a freshly loaded entity.
+    // They must never merge the User held in SessionBean: that copy was loaded at login,
+    // and merging it would write back every field as it was then. A profile save in an
+    // old session used to restore the password from before a reset.
+
+    /**
+     * Updates display name and email, returning the fresh entity for the session.
+     *
+     * @throws IllegalArgumentException if the email belongs to another account
+     */
+    public User updateProfile(Long userId, String displayName, String email) {
+        User user = userDao.findById(userId);
+        String normalizedEmail = (email != null && !email.trim().isEmpty()) ? email.trim() : null;
+        if (normalizedEmail != null) {
+            User holder = userDao.findByEmail(normalizedEmail);
+            if (holder != null && !holder.getId().equals(userId)) {
+                throw new IllegalArgumentException("That email address is used by another account.");
+            }
+        }
+        user.setDisplayName(displayName);
+        user.setEmail(normalizedEmail);
+        return user;
     }
 
-    public User update(User user) {
-        return userDao.update(user);
+    /** True when another account already uses this email address. */
+    public boolean isEmailUsedByOther(Long userId, String email) {
+        if (email == null || email.trim().isEmpty()) {
+            return false;
+        }
+        User holder = userDao.findByEmail(email.trim());
+        return holder != null && !holder.getId().equals(userId);
     }
 
-    public boolean checkPassword(User user, String plaintext) {
-        return PasswordUtil.checkPassword(plaintext, user.getPasswordHash());
-    }
-
-    public void updatePassword(User user, String newPlaintext) {
-        user.setPasswordHash(PasswordUtil.hashPassword(newPlaintext));
-        userDao.update(user);
+    /** Sets or clears the home location used for weather. Returns the fresh entity. */
+    public User updateLocation(Long userId, Double latitude, Double longitude, String locationName) {
+        User user = userDao.findById(userId);
+        user.setLatitude(latitude);
+        user.setLongitude(longitude);
+        user.setLocationName(locationName);
+        return user;
     }
 
     /**
-     * Generate a single-use password reset token for the user matching the given
-     * username or email. Returns the plaintext token to display to the user, or
-     * {@code null} if no matching account exists. Callers should always respond
-     * with a generic success message to avoid leaking which accounts are registered.
+     * Changes the password if {@code currentPlaintext} is right. Signs out every other
+     * session (see {@link User#getCredentialsVersion()}); the caller must give its own
+     * session the returned user's new version to stay signed in.
+     *
+     * @return the fresh entity, or null if the current password was wrong
      */
-    public String requestPasswordReset(String usernameOrEmail) {
-        if (usernameOrEmail == null) {
+    public User changePassword(Long userId, String currentPlaintext, String newPlaintext) {
+        User user = userDao.findById(userId);
+        if (user == null || !PasswordUtil.checkPassword(currentPlaintext, user.getPasswordHash())) {
+            return null;
+        }
+        user.changePasswordHash(PasswordUtil.hashPassword(newPlaintext));
+        return user;
+    }
+
+    /**
+     * The account's current credentials version, or -1 if the account no longer exists.
+     * AuthFilter calls this on every signed-in page request, so it reads one column.
+     */
+    public int getCredentialsVersion(Long userId) {
+        return userDao.findCredentialsVersion(userId);
+    }
+
+    // --- password reset (see PasswordResetService) --------------------------
+
+    /** The account whose username, or failing that whose email, matches. */
+    public User findByUsernameOrEmail(String usernameOrEmail) {
+        if (usernameOrEmail == null || usernameOrEmail.trim().isEmpty()) {
             return null;
         }
         String trimmed = usernameOrEmail.trim();
-        if (trimmed.isEmpty()) {
-            return null;
-        }
         User user = userDao.findByUsername(trimmed);
-        if (user == null) {
-            user = userDao.findByEmail(trimmed);
-        }
-        if (user == null) {
-            return null;
-        }
+        return user != null ? user : userDao.findByEmail(trimmed);
+    }
 
+    /** True when a reset token was issued for this user within the last {@code minutes}. */
+    public boolean isResetRequestedWithin(User user, int minutes) {
+        LocalDateTime expiresAt = user.getPasswordResetExpiresAt();
+        if (expiresAt == null) {
+            return false;
+        }
+        LocalDateTime issuedAt = expiresAt.minusMinutes(RESET_TOKEN_TTL_MINUTES);
+        return issuedAt.isAfter(LocalDateTime.now().minusMinutes(minutes));
+    }
+
+    /**
+     * Issues a single-use reset token, valid for {@value #RESET_TOKEN_TTL_MINUTES}
+     * minutes, replacing any earlier one. Returns the token to put in the emailed link.
+     * Only its SHA-256 hash is stored, so a copy of the database does not contain
+     * working reset links.
+     */
+    public String issuePasswordResetToken(User user) {
         byte[] bytes = new byte[RESET_TOKEN_BYTES];
         RANDOM.nextBytes(bytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
 
-        user.setPasswordResetToken(token);
+        user.setPasswordResetToken(hashToken(token));
         user.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(RESET_TOKEN_TTL_MINUTES));
         userDao.update(user);
         return token;
@@ -119,7 +180,7 @@ public class UserService {
         if (token == null || token.trim().isEmpty()) {
             return null;
         }
-        User user = userDao.findByPasswordResetToken(token.trim());
+        User user = userDao.findByPasswordResetToken(hashToken(token.trim()));
         if (user == null) {
             return null;
         }
@@ -135,10 +196,17 @@ public class UserService {
         if (user == null) {
             return false;
         }
-        user.setPasswordHash(PasswordUtil.hashPassword(newPlaintext));
-        user.setPasswordResetToken(null);
-        user.setPasswordResetExpiresAt(null);
+        user.changePasswordHash(PasswordUtil.hashPassword(newPlaintext));
         userDao.update(user);
         return true;
+    }
+
+    private static String hashToken(String token) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is required by the Java platform", e);
+        }
     }
 }

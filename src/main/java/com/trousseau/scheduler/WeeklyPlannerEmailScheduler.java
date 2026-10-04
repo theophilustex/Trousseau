@@ -3,20 +3,15 @@ package com.trousseau.scheduler;
 import com.trousseau.model.Outfit;
 import com.trousseau.model.PlannedOutfit;
 import com.trousseau.model.User;
+import com.trousseau.service.MailService;
 import com.trousseau.service.UserService;
 import com.trousseau.service.WeeklyPlannerService;
 
-import javax.annotation.Resource;
 import javax.ejb.Schedule;
 import javax.ejb.Singleton;
 import javax.ejb.Startup;
 import javax.inject.Inject;
-import javax.mail.Message;
 import javax.mail.MessagingException;
-import javax.mail.Session;
-import javax.mail.Transport;
-import javax.mail.internet.InternetAddress;
-import javax.mail.internet.MimeMessage;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -39,7 +34,6 @@ public class WeeklyPlannerEmailScheduler {
 
     private static final Logger LOG = Logger.getLogger(WeeklyPlannerEmailScheduler.class.getName());
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMMM d, yyyy");
-    private static final String DEFAULT_FROM = "noreply@trousseau.app";
 
     @Inject
     private UserService userService;
@@ -47,9 +41,8 @@ public class WeeklyPlannerEmailScheduler {
     @Inject
     private WeeklyPlannerService weeklyPlannerService;
 
-    // WildFly default mail session — configure in standalone.xml before use
-    @Resource(lookup = "java:jboss/mail/Default")
-    private Session mailSession;
+    @Inject
+    private MailService mailService;
 
     @Schedule(dayOfWeek = "Sun", hour = "17", minute = "0", second = "0", persistent = false)
     public void sendWeeklyPlannerEmails() {
@@ -94,21 +87,9 @@ public class WeeklyPlannerEmailScheduler {
     }
 
     private void sendEmail(User user, Outfit[] plan, LocalDate monday) throws MessagingException {
-        if (mailSession == null) {
-            LOG.warning("Mail session not configured — skipping email for " + user.getEmail());
-            return;
-        }
-
-        // The sender comes from the mail session's "from" attribute (mail.from), so
-        // each deployment can use an address its SMTP provider accepts.
-        String from = mailSession.getProperty("mail.from");
-        MimeMessage msg = new MimeMessage(mailSession);
-        msg.setFrom(new InternetAddress(from != null && !from.isBlank() ? from : DEFAULT_FROM, false));
-        msg.setRecipient(Message.RecipientType.TO, new InternetAddress(user.getEmail()));
-        msg.setSubject("Your Trousseau Weekly Outfit Plan — Week of " + monday.format(DATE_FMT));
-        msg.setContent(buildEmailBody(user, plan, monday), "text/html; charset=UTF-8");
-
-        Transport.send(msg);
+        mailService.send(user.getEmail(),
+                "Your Trousseau Weekly Outfit Plan — Week of " + monday.format(DATE_FMT),
+                buildEmailBody(user, plan, monday));
     }
 
     private String buildEmailBody(User user, Outfit[] plan, LocalDate monday) {
@@ -179,7 +160,6 @@ public class WeeklyPlannerEmailScheduler {
     }
 
     private String escapeHtml(String s) {
-        if (s == null) return "";
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+        return MailService.escapeHtml(s);
     }
 }

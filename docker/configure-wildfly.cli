@@ -40,7 +40,8 @@ module add --name=org.postgresql --resources=/tmp/jdbc/postgresql.jar --dependen
 /subsystem=undertow/server=default-server/http-listener=default:write-attribute(name=max-post-size, value="${env.MAX_UPLOAD_BYTES:268435456}")
 
 # Trust X-Forwarded-* headers only when a reverse proxy sets them. Enabled
-# without one, any client could choose the host in password-reset links.
+# without one, any client could forge its address and scheme. (Emailed links
+# do not depend on this; they use TROUSSEAU_BASE_URL.)
 /subsystem=undertow/server=default-server/http-listener=default:write-attribute(name=proxy-address-forwarding, value="${env.BEHIND_PROXY:false}")
 
 stop-embedded-server

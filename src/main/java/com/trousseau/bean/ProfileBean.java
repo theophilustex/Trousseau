@@ -34,7 +34,10 @@ public class ProfileBean implements Serializable {
 
     @PostConstruct
     public void init() {
-        User currentUser = sessionBean.getCurrentUser();
+        // Load fresh rather than show the session snapshot, which may predate a change
+        // made from another device.
+        User currentUser = sessionBean.getCurrentUser() == null ? null
+                : userService.findById(sessionBean.getCurrentUser().getId());
         if (currentUser != null) {
             displayName = currentUser.getDisplayName();
             email = currentUser.getEmail();
@@ -44,12 +47,20 @@ public class ProfileBean implements Serializable {
         }
     }
 
+    /*
+     * Every save below goes through an id-based UserService method and then refreshes the
+     * session's snapshot. Merging the snapshot itself would write back stale fields,
+     * including a password hash from before a reset.
+     */
+
     public void updateProfile() {
-        User currentUser = sessionBean.getCurrentUser();
-        currentUser.setDisplayName(displayName);
-        currentUser.setEmail(email);
-        userService.update(currentUser);
-        sessionBean.setCurrentUser(currentUser);
+        Long userId = sessionBean.getCurrentUser().getId();
+        if (userService.isEmailUsedByOther(userId, email)) {
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "That email address is used by another account", null));
+            return;
+        }
+        sessionBean.refresh(userService.updateProfile(userId, displayName, email));
 
         FacesContext.getCurrentInstance().addMessage(null,
                 new FacesMessage(FacesMessage.SEVERITY_INFO, "Profile updated successfully", null));
@@ -60,8 +71,6 @@ public class ProfileBean implements Serializable {
      * turns weather off, which is the right behaviour for a server with no route out.
      */
     public void updateLocation() {
-        User currentUser = sessionBean.getCurrentUser();
-
         if (latitude != null && (latitude < -90 || latitude > 90)) {
             FacesContext.getCurrentInstance().addMessage(null,
                     new FacesMessage(FacesMessage.SEVERITY_ERROR, "Latitude must be between -90 and 90", null));
@@ -73,11 +82,8 @@ public class ProfileBean implements Serializable {
             return;
         }
 
-        currentUser.setLatitude(latitude);
-        currentUser.setLongitude(longitude);
-        currentUser.setLocationName(locationName);
-        userService.update(currentUser);
-        sessionBean.setCurrentUser(currentUser);
+        Long userId = sessionBean.getCurrentUser().getId();
+        sessionBean.refresh(userService.updateLocation(userId, latitude, longitude, locationName));
 
         boolean on = latitude != null && longitude != null;
         FacesContext.getCurrentInstance().addMessage(null,
@@ -100,22 +106,21 @@ public class ProfileBean implements Serializable {
     public String getLocationName() { return locationName; }
     public void setLocationName(String locationName) { this.locationName = locationName; }
 
+    /** Changes the password, keeping this session signed in and signing out all others. */
     public void changePassword() {
-        User currentUser = sessionBean.getCurrentUser();
-
-        if (!userService.checkPassword(currentUser, currentPassword)) {
-            FacesContext.getCurrentInstance().addMessage(null,
-                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "Current password is incorrect", null));
-            return;
-        }
-
         if (!newPassword.equals(confirmNewPassword)) {
             FacesContext.getCurrentInstance().addMessage(null,
                     new FacesMessage(FacesMessage.SEVERITY_ERROR, "New passwords do not match", null));
             return;
         }
 
-        userService.updatePassword(currentUser, newPassword);
+        User updated = userService.changePassword(sessionBean.getCurrentUser().getId(), currentPassword, newPassword);
+        if (updated == null) {
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "Current password is incorrect", null));
+            return;
+        }
+        sessionBean.refresh(updated);
         currentPassword = null;
         newPassword = null;
         confirmNewPassword = null;

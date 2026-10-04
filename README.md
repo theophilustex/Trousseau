@@ -101,7 +101,7 @@ src/main/
 
 ## Status and known issues
 
-Trousseau is at `1.0.0-SNAPSHOT`. There is no automated test suite. Before exposing an instance to people you don't trust, read [Security → Known issues](docs/security.md#known-issues). In particular, the password-reset flow and the item detail pages have authorization gaps. Functional bugs are listed in [Development → Known bugs](docs/development.md#known-bugs).
+Trousseau is at `1.0.0-SNAPSHOT`. There is no automated test suite. Before exposing an instance to people you don't trust, read [Security](docs/security.md): it lists the remaining known issues and a hardening checklist. Password reset needs `TROUSSEAU_BASE_URL` and SMTP configured before it works. Functional bugs are listed in [Development → Known bugs](docs/development.md#known-bugs).
 
 ## License
 

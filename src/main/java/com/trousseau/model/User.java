@@ -75,6 +75,19 @@ public class User implements Serializable {
     @Column(name = "password_reset_expires_at")
     private LocalDateTime passwordResetExpiresAt;
 
+    /**
+     * Incremented whenever the password changes. A session remembers the value it saw
+     * at login, and AuthFilter ends any session whose value is out of date, so a
+     * password change or reset signs out every other device.
+     *
+     * <p>A counter rather than a timestamp, so there is no precision to lose between
+     * Java and the database. Nullable because hbm2ddl adds it as NULL to existing rows;
+     * {@link #getCredentialsVersion()} reads NULL as 0.</p>
+     */
+    @Getter(lombok.AccessLevel.NONE)
+    @Column(name = "credentials_version")
+    private Integer credentialsVersion = 0;
+
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ClothingItem> clothingItems = new ArrayList<>();
 
@@ -90,5 +103,17 @@ public class User implements Serializable {
         if (displayName == null || displayName.isEmpty()) {
             displayName = username;
         }
+    }
+
+    public int getCredentialsVersion() {
+        return credentialsVersion == null ? 0 : credentialsVersion;
+    }
+
+    /** Sets a new password hash and invalidates every outstanding session and reset link. */
+    public void changePasswordHash(String newHash) {
+        this.passwordHash = newHash;
+        this.credentialsVersion = getCredentialsVersion() + 1;
+        this.passwordResetToken = null;
+        this.passwordResetExpiresAt = null;
     }
 }

@@ -8,6 +8,7 @@ import com.trousseau.model.OutfitWearLog;
 import com.trousseau.model.Rating;
 import com.trousseau.model.RatingType;
 import com.trousseau.model.User;
+import com.trousseau.service.AccessService;
 import com.trousseau.service.ClothingItemService;
 import com.trousseau.service.CommentService;
 import com.trousseau.service.OutfitService;
@@ -32,6 +33,7 @@ public class OutfitDetailBean implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Inject private OutfitService outfitService;
+    @Inject private AccessService accessService;
     @Inject private RatingService ratingService;
     @Inject private CommentService commentService;
     @Inject private ShareService shareService;
@@ -55,6 +57,8 @@ public class OutfitDetailBean implements Serializable {
     private String shareUsername;
     private List<ClothingItemSummary> availableItems;
     private Long selectedItemId;
+    /** Creator of the outfit. Others who can see it may rate and comment, nothing more. */
+    private boolean owner;
 
     // Wear tracking
     private List<OutfitWearLog> recentWearLogs;
@@ -63,16 +67,26 @@ public class OutfitDetailBean implements Serializable {
     private String currentSeason;
     private LocalDate wearDate;
 
+    /**
+     * Loads the outfit named by the id parameter. Answers 404 when it does not exist or
+     * the current user may not see it (see {@link AccessService}).
+     */
     public void loadOutfit() {
-        if (outfitId != null) {
-            outfit = outfitService.findById(outfitId);
-            comments = commentService.findByOutfit(outfit);
-            User currentUser = sessionBean.getCurrentUser();
-            availableItems = clothingItemService.findSummariesByOwner(currentUser);
-            loadRatings();
-            loadExistingUserRatings();
-            loadWearStats();
+        User viewer = sessionBean.getCurrentUser();
+        if (!accessService.canViewOutfit(viewer, outfitId)) {
+            outfit = null;
+            PageResponses.notFound();
+            return;
         }
+        owner = accessService.ownsOutfit(viewer, outfitId);
+        outfit = outfitService.findById(outfitId);
+        comments = commentService.findByOutfit(outfit);
+        if (owner) {
+            availableItems = clothingItemService.findSummariesByOwner(viewer);
+        }
+        loadRatings();
+        loadExistingUserRatings();
+        loadWearStats();
     }
 
     public void loadRatings() {
@@ -115,6 +129,7 @@ public class OutfitDetailBean implements Serializable {
     }
 
     public void recordWear() {
+        if (refuseUnlessOwner()) return;
         User currentUser = sessionBean.getCurrentUser();
         LocalDate date = wearDate != null ? wearDate : LocalDate.now();
         outfitWearLogService.recordWear(outfit, currentUser, date);
@@ -161,6 +176,7 @@ public class OutfitDetailBean implements Serializable {
     }
 
     public void shareOutfit() {
+        if (refuseUnlessOwner()) return;
         if (shareUsername != null && !shareUsername.trim().isEmpty()) {
             User targetUser = userService.findByUsername(shareUsername);
             if (targetUser != null) {
@@ -176,6 +192,7 @@ public class OutfitDetailBean implements Serializable {
     }
 
     public void addItemToOutfit() {
+        if (refuseUnlessOwner()) return;
         if (selectedItemId != null) {
             ClothingItem item = clothingItemService.findById(selectedItemId);
             if (item != null) {
@@ -188,6 +205,7 @@ public class OutfitDetailBean implements Serializable {
     }
 
     public void removeItemFromOutfit(ClothingItem item) {
+        if (refuseUnlessOwner()) return;
         outfitService.removeItemFromOutfit(outfit, item);
         outfit = outfitService.findById(outfitId);
         FacesContext.getCurrentInstance().addMessage(null,
@@ -195,13 +213,26 @@ public class OutfitDetailBean implements Serializable {
     }
 
     public String deleteOutfit() {
+        if (refuseUnlessOwner()) return null;
         outfitService.deleteOutfit(outfit);
         return "outfits?faces-redirect=true";
     }
 
     public boolean isOwner() {
-        User currentUser = sessionBean.getCurrentUser();
-        return outfit != null && outfit.getCreator() != null && outfit.getCreator().equals(currentUser);
+        return owner;
+    }
+
+    /**
+     * Owner-only controls are not rendered for anyone else, and JSF will not invoke an
+     * unrendered component, but each action checks again rather than rely on that.
+     */
+    private boolean refuseUnlessOwner() {
+        if (owner) {
+            return false;
+        }
+        FacesContext.getCurrentInstance().addMessage(null,
+                new FacesMessage(FacesMessage.SEVERITY_ERROR, "Only the owner can change this outfit", null));
+        return true;
     }
 
     // --- Getters/Setters ---

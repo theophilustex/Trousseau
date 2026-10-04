@@ -42,9 +42,13 @@ Clicking **Trousseau** in the nav bar while signed in shows a small dashboard: h
 
 ### Forgot your password
 
-The **Forgot your password?** link on the login page opens a form where you enter your username or email. Trousseau does not email the reset link. If the account exists, the link is **shown on screen**. Open it within **60 minutes** to set a new password. Each link works once.
+The **Forgot your password?** link on the login page opens a form where you enter your username or email. If your account has an email address, Trousseau emails you a link. Open it within **60 minutes** to set a new password. Each link works once, and asking again within 2 minutes doesn't send another.
 
-> ⚠️ In the current version this page is only reachable while signed in. See [Development → Known bugs](development.md#known-bugs). Changing a password you still know is done from [Profile](#profile).
+- The page says "Check your email" whatever you enter. That's deliberate: it stops strangers using the form to find out who has an account.
+- **No email address on your account means no reset link.** Add one in [Profile](#profile) while you can still sign in, or ask whoever runs the server for help.
+- If the page says *Password reset isn't set up*, the server hasn't been configured to send these emails ([Docker](docker.md#configuration): `TROUSSEAU_BASE_URL` and the SMTP settings).
+
+Setting a new password this way signs out every device that was signed in to your account. Changing a password you still know is done from [Profile](#profile).
 
 ---
 
@@ -160,7 +164,7 @@ Click an outfit to open it.
 | Panel | What you can do |
 |---|---|
 | **Items in this Outfit** | Thumbnails of each item, linking to the item. As the owner you can **add** an item from the dropdown or **remove** one. |
-| **Wear Tracking** | Pick a date (defaults to today) and click **Record Wear**. This logs the outfit as worn on that date **and** records one wear on every item in it, which may flag items for washing. The panel shows wears this month, wears this season, and the 10 most recent wear dates. |
+| **Wear Tracking** | (Owner only, for recording) Pick a date (defaults to today) and click **Record Wear**. This logs the outfit as worn on that date **and** records one wear on every item in it, which may flag items for washing. The panel shows wears this month, wears this season, and the 10 most recent wear dates. |
 | **Ratings** | Give 1–5 stars under any of **Personal**, **Spouse/Partner** and **Friends/Other**, then **Submit Ratings**. Each person has one rating per category per outfit; submitting again updates it. The page shows each category's average and an **Overall Average**, which is the mean of the three category averages. |
 | **Comments** | Post a comment. You can delete your own comments. |
 | **Share Outfit** | (Owner only) Share with another user by username. |
@@ -239,9 +243,14 @@ The **Shared** page has two tabs:
 - **Shared With Me**: things others have shared with you, with the owner's name, the date, and a link to open each one.
 - **Shared By Me**: things you've shared and who you shared them with. **Unshare** removes the share.
 
-People you share an outfit with can view it, rate it and comment on it. Only you can edit or delete it.
+What the other person can do:
 
-> ⚠️ For **items**, the current version shows the recipient the full item page including the edit, retire and delete buttons. Only share items with people you trust. See [Security](security.md#known-issues).
+| Shared | They can | Only you can |
+|---|---|---|
+| **Outfit** | See it with its item photos, **rate** it and **comment** on it, and open each item in it | Add or remove items, record wears, share it further, delete it |
+| **Item** | See its photo (and download it), details, wear stats and tags | Everything else. Its price, cost per wear and receipt stay private. |
+
+Nobody can open your items or outfits unless you've shared them, even if they guess the address. Unsharing takes effect immediately.
 
 ---
 
@@ -251,7 +260,7 @@ People you share an outfit with can view it, rate it and comment on it. Only you
 |---|---|
 | **Profile Information** | Change your display name and email. |
 | **Location** | Optional. Enter **latitude**, **longitude** and a label (e.g. "Home"). This switches on weather-aware planning. To find coordinates, right-click a spot in most map apps and copy them. Latitude must be −90…90 and longitude −180…180. **Clear** turns weather off again. Forecasts come from [Open-Meteo](https://open-meteo.com), which needs no account. |
-| **Change Password** | Enter your current password and the new one twice. |
+| **Change Password** | Enter your current password and the new one twice. You stay signed in here, and **every other device is signed out**. Use this if you think someone else has your password. |
 
 ---
 

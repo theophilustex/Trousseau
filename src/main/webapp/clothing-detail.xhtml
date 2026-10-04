@@ -23,8 +23,12 @@
                             <span class="badge badge-retired">#{clothingDetailBean.item.status.displayName}</span>
                         </ui:fragment>
                     </h2>
-                    <h:link outcome="/wardrobe" styleClass="btn btn-outline btn-sm">
+                    <h:link outcome="/wardrobe" styleClass="btn btn-outline btn-sm" rendered="#{clothingDetailBean.owner}">
                         <i class="pi pi-arrow-left"></i> Back to Wardrobe
+                    </h:link>
+                    <h:link outcome="/shared" styleClass="btn btn-outline btn-sm"
+                            rendered="#{not clothingDetailBean.owner}">
+                        <i class="pi pi-arrow-left"></i> Back to Shared
                     </h:link>
                 </div>
 
@@ -80,8 +84,8 @@
                             </div>
                         </p:panel>
 
-                        <!-- Purchase & Cost Per Wear Panel -->
-                        <p:panel header="Purchase &amp; Value" styleClass="detail-panel">
+                        <!-- Purchase & Cost Per Wear Panel (owner only: prices are private) -->
+                        <p:panel header="Purchase &amp; Value" styleClass="detail-panel" rendered="#{clothingDetailBean.owner}">
                             <ui:fragment rendered="#{clothingDetailBean.item.costPerWear != null}">
                             <div class="cpw-summary">
                                 <div class="cpw-figure">
@@ -172,7 +176,7 @@
                                 #{clothingDetailBean.item.needsWash ? 'Needs Washing!' : 'Clean'}
                             </div>
 
-                            <div class="wear-actions">
+                            <h:panelGroup layout="block" styleClass="wear-actions" rendered="#{clothingDetailBean.owner}">
                                 <p:commandButton value="Record Wear" icon="pi pi-refresh"
                                                action="#{clothingDetailBean.recordWear()}"
                                                update="@form :growl"
@@ -182,7 +186,7 @@
                                                update="@form :growl"
                                                rendered="#{clothingDetailBean.item.needsWash}"
                                                styleClass="btn btn-success" />
-                            </div>
+                            </h:panelGroup>
                         </p:panel>
 
                         <!-- Tags Panel -->
@@ -193,7 +197,7 @@
                                         #{tag.name}
                                         <p:commandLink action="#{clothingDetailBean.removeTag(tag)}"
                                                      update="@form" styleClass="tag-remove"
-                                                     title="Remove tag">
+                                                     title="Remove tag" rendered="#{clothingDetailBean.owner}">
                                             <i class="pi pi-times"></i>
                                         </p:commandLink>
                                     </span>
@@ -202,7 +206,7 @@
                                     No tags added yet
                                 </span>
                             </div>
-                            <div class="tag-add-form">
+                            <h:panelGroup layout="block" styleClass="tag-add-form" rendered="#{clothingDetailBean.owner}">
                                 <p:selectOneMenu value="#{clothingDetailBean.selectedTagId}"
                                                styleClass="filter-select">
                                     <f:selectItem itemLabel="Select tag..." itemValue="" />
@@ -218,11 +222,11 @@
                                 <p:commandButton value="Create" icon="pi pi-plus"
                                                action="#{clothingDetailBean.createAndAddTag()}"
                                                update="@form" styleClass="btn btn-sm btn-primary" />
-                            </div>
+                            </h:panelGroup>
                         </p:panel>
 
                         <!-- Receipt Panel -->
-                        <p:panel header="Receipt" styleClass="detail-panel">
+                        <p:panel header="Receipt" styleClass="detail-panel" rendered="#{clothingDetailBean.owner}">
                             <ui:fragment rendered="#{clothingDetailBean.item.receiptData != null}">
                                 <div class="receipt-info">
                                     <i class="pi pi-file"></i>
@@ -254,8 +258,8 @@
                             </ui:fragment>
                         </p:panel>
 
-                        <!-- Share Panel -->
-                        <p:panel header="Lifecycle" styleClass="detail-panel">
+                        <!-- Lifecycle Panel -->
+                        <p:panel header="Lifecycle" styleClass="detail-panel" rendered="#{clothingDetailBean.owner}">
                             <ui:fragment rendered="#{!clothingDetailBean.item.retired}">
                                 <p class="lifecycle-note">
                                     Retiring keeps the item's wear history and final cost per wear.
@@ -309,7 +313,7 @@
                             </ui:fragment>
                         </p:panel>
 
-                        <p:panel header="Share Item" styleClass="detail-panel">
+                        <p:panel header="Share Item" styleClass="detail-panel" rendered="#{clothingDetailBean.owner}">
                             <div class="share-form">
                                 <p:inputText value="#{clothingDetailBean.shareUsername}"
                                            placeholder="Enter username to share with..."
@@ -322,11 +326,11 @@
                         </p:panel>
 
                         <!-- Delete -->
-                        <div class="danger-zone">
+                        <h:panelGroup layout="block" styleClass="danger-zone" rendered="#{clothingDetailBean.owner}">
                             <p:commandButton value="Delete Item" icon="pi pi-trash"
                                            styleClass="btn btn-danger"
                                            onclick="PF('deleteConfirm').show()" type="button" />
-                        </div>
+                        </h:panelGroup>
                     </div>
                 </div>
             </div>
@@ -335,7 +339,8 @@
         <!-- Delete Confirmation Dialog -->
         <p:confirmDialog header="Delete Item" widgetVar="deleteConfirm"
                         message="Are you sure you want to delete this item? This cannot be undone."
-                        severity="alert">
+                        severity="alert"
+                        rendered="#{clothingDetailBean.owner}">
             <h:form>
                 <p:commandButton value="Yes, Delete" icon="pi pi-check"
                                action="#{clothingDetailBean.deleteItem()}"

@@ -44,14 +44,14 @@ flowchart TD
 
 | Package | Contents |
 |---|---|
-| `bean` | One backing bean per page, plus `SessionBean` (logged-in user) and `ImageStreamer` (photo endpoint) |
+| `bean` | One backing bean per page, plus `SessionBean` (logged-in user), `ImageStreamer` (photo endpoint) and `PageResponses` (404 helper) |
 | `converter` | `clothingItemConverter`, `tagConverter`: JSF converters between entity and id string, for select components |
 | `dao` | `UserDao`, `ClothingItemDao`, `TagDao`, `OutfitDao`, `RatingDao`, `CommentDao`, `ShareDao`, `OutfitWearLogDao`, `PlannedOutfitDao` |
 | `filter` | `AuthFilter`: redirects unauthenticated requests to the login page |
 | `model` | **Entities**: `User`, `ClothingItem`, `Tag`, `Outfit`, `Rating`, `Comment`, `Share`, `OutfitWearLog`, `PlannedOutfit`<br/>**Enums**: `ItemStatus`, `RatingType`<br/>**Projections / value objects**: `ClothingItemSummary`, `ItemWearStat`, `CategoryWearStat`, `OutfitWearStat`, `MonthlyWearStat`, `DayForecast` |
 | `scheduler` | `WeeklyPlannerEmailScheduler` |
-| `service` | `UserService`, `ClothingItemService`, `TagService`, `OutfitService`, `OutfitWearLogService`, `RatingService`, `CommentService`, `ShareService`, `InsightsService`, `WeeklyPlannerService`, `WeatherService`, `DataExportImportService` |
-| `util` | `PasswordUtil` (bcrypt), `ImageUtil` (thumbnails) |
+| `service` | `UserService`, `AccessService`, `PasswordResetService`, `MailService`, `ClothingItemService`, `TagService`, `OutfitService`, `OutfitWearLogService`, `RatingService`, `CommentService`, `ShareService`, `InsightsService`, `WeeklyPlannerService`, `WeatherService`, `DataExportImportService` |
+| `util` | `PasswordUtil` (bcrypt), `ImageUtil` (thumbnails), `AppConfig` (public base URL from the environment) |
 
 The full entity model is in [Data model](data-model.md).
 
@@ -59,10 +59,10 @@ The full entity model is in [Data model](data-model.md).
 
 ## Request lifecycle
 
-1. **`AuthFilter`** (`@WebFilter("*.xhtml")`) lets the request through if it is for `login`, `register` or `index`, for a JSF/static resource, or comes from a session with the `com.trousseau.loggedIn` attribute set. Otherwise it redirects to `/login.xhtml`.
+1. **`AuthFilter`** (`@WebFilter("*.xhtml")`) lets the request through if its servlet path is one of the public pages (`index`, `login`, `register`, `forgot-password`, `reset-password`) or a JSF resource, or if the session has the `com.trousseau.loggedIn` attribute set. Otherwise it redirects to `/login.xhtml`. It compares exact, container-normalised servlet paths, never substrings of the raw URI. For signed-in sessions it also checks the credentials version, so sessions end after a password change elsewhere.
 2. **`PrimeFaces FileUpload Filter`** (from `web.xml`) parses multipart bodies for `<p:fileUpload>`.
 3. **`FacesServlet`** (mapped to `*.xhtml`) runs the JSF lifecycle. View-scoped beans are created on first access and their `@PostConstruct` loads the page data.
-4. Pages that take an id (`clothing-detail.xhtml?id=…`, `outfit-detail.xhtml?id=…`) bind it with `<f:viewParam>` and load with a `preRenderView` event listener (`loadItem()` / `loadOutfit()`).
+4. Pages that take an id (`clothing-detail.xhtml?id=…`, `outfit-detail.xhtml?id=…`) bind it with `<f:viewParam>` and load with a `preRenderView` event listener (`loadItem()` / `loadOutfit()`). The listener asks `AccessService` first and ends the request with 404 (`PageResponses.notFound()`) if the user may not see the object.
 5. Actions are mostly AJAX `p:commandButton`s. They call a bean method, which calls a service, adds a `FacesMessage` and refreshes the bean's lists. The page shows messages through the `<p:growl id="growl">` in the layout.
 
 Navigation uses implicit outcomes (`"wardrobe?faces-redirect=true"`). The two rules in `faces-config.xml` (login→wardrobe, register→login) do the same thing in the old style.
@@ -73,11 +73,12 @@ Navigation uses implicit outcomes (`"wardrobe?faces-redirect=true"`). The two ru
 
 - **Registration**: `UserService.register()` checks that the username and email are unique and stores a **bcrypt** hash (cost 12) in `app_user.password_hash`.
 - **Login**: `LoginBean` → `UserService.authenticate()` → `SessionBean.login(user)`. This stores the `User` entity in the session-scoped bean and sets the `com.trousseau.loggedIn` session attribute that `AuthFilter` checks.
-- **Current user**: every bean injects `SessionBean` and calls `getCurrentUser()`. The `User` held there is a **detached** entity. Services merge it when they update it.
+- **Current user**: every bean injects `SessionBean` and calls `getCurrentUser()`. The `User` held there is a **detached snapshot** from login. It is never merged back: account changes go through id-based `UserService` methods, and `SessionBean.refresh()` replaces the snapshot afterwards.
+- **Session invalidation**: the session also records the account's credentials version. `AuthFilter` checks it against the database on each signed-in request and ends the session once a password change or reset has moved it on (see [Security → Sessions](security.md#sessions-and-password-changes)).
 - **Logout**: invalidates the HTTP session.
-- **Password reset**: a 32-byte `SecureRandom` token, base64url-encoded, stored on the user with a 60-minute expiry. The link is shown on screen (there is no email). See [Security](security.md).
+- **Password reset**: `PasswordResetService` emails a single-use link to the account's address. The link is built from the configured base URL (`AppConfig.baseUrl()`), and only a SHA-256 hash of the token is stored. See [Security → Password reset](security.md#password-reset).
 
-There are no roles. All authenticated users have the same permissions, and ownership is checked in individual beans (see [Security → Authorization model](security.md#authorization-model)).
+There are no roles. Lists are scoped to the current user by their queries, and anything loaded by id goes through **`AccessService`**, which decides who may view or change an item or outfit (see [Security → Authorization model](security.md#authorization-model)).
 
 ---
 
@@ -88,7 +89,7 @@ There are no roles. All authenticated users have the same permissions, and owner
 | `index.xhtml` | `wardrobeBean`, `outfitListBean` | Landing hero (anonymous) / mini dashboard (signed in) |
 | `login.xhtml` | `LoginBean` (request) | Sign in |
 | `register.xhtml` | `RegisterBean` (request) | Create account |
-| `forgot-password.xhtml` | `ForgotPasswordBean` (request) | Generate a reset link |
+| `forgot-password.xhtml` | `ForgotPasswordBean` (request) | Request a reset email (same response whatever is entered) |
 | `reset-password.xhtml` | `ResetPasswordBean` (view) | Set a new password from `?token=` |
 | `wardrobe.xhtml` | `WardrobeBean` (view) | Item grid, filters, add dialog, wash alerts, retired list |
 | `bulk-add.xhtml` | `BulkAddBean` (view) | Multi-photo upload into editable drafts |
@@ -110,7 +111,10 @@ Bean names in EL are the class name with a lowercase first letter (`@Named` with
 
 | Service | Type | Notes |
 |---|---|---|
-| `UserService` | `@Stateless` | Register, authenticate, profile and password updates, reset tokens |
+| `UserService` | `@Stateless` | Register, authenticate, profile and password updates, hashed reset tokens |
+| `AccessService` | `@Stateless` | Who may view or change an item or outfit. Detail pages and `ImageStreamer` must call it. |
+| `PasswordResetService` | `@Stateless` | Forgot-password flow: token, throttle, email. Returns nothing, so callers can't leak whether an account exists. |
+| `MailService` | `@Stateless` | HTML email via `java:jboss/mail/Default`: `send()` (synchronous) and `@Asynchronous sendInBackground()` |
 | `ClothingItemService` | `@Stateless` | Item CRUD, wear/wash, batch wash, retire/reactivate, receipts, tags. **The only place photos should be attached** (`attachImage()`), so a thumbnail is always generated. Also holds the category list. |
 | `TagService` | `@Stateless` | Per-user tags; `findOrCreate()` |
 | `OutfitService` | `@Stateless` | Outfit CRUD. `findById` / `findByCreator` initialise lazy collections inside the transaction. |
@@ -135,7 +139,7 @@ There is one: **`WeeklyPlannerEmailScheduler`**, a `@Singleton @Startup` EJB wit
 @Schedule(dayOfWeek = "Sun", hour = "17", minute = "0", second = "0", persistent = false)
 ```
 
-For each user with an email address it calls `WeeklyPlannerService.getOrCreateWeekPlan(user, nextMonday)` and sends an inline-styled HTML email through the `java:jboss/mail/Default` session. Errors are caught per user. Operational details are in [Setup → Weekly email](setup-and-deployment.md#weekly-email-smtp).
+For each user with an email address it calls `WeeklyPlannerService.getOrCreateWeekPlan(user, nextMonday)` and sends an inline-styled HTML email through `MailService` (the `java:jboss/mail/Default` session). Errors are caught per user. Operational details are in [Setup → Weekly email](setup-and-deployment.md#weekly-email-smtp).
 
 ---
 
@@ -143,7 +147,7 @@ For each user with an email address it calls `WeeklyPlannerService.getOrCreateWe
 
 `ImageStreamer` is an `@ApplicationScoped` bean used with PrimeFaces `<p:graphicImage value="#{imageStreamer.thumbnail}">` plus `<f:param name="itemId" …>`.
 
-PrimeFaces streams images in two requests. During the page's `RENDER_RESPONSE` phase the bean returns empty content, and PrimeFaces only writes a URL. The browser then fetches that URL, and on that request the bean reads `itemId` and returns the bytes.
+PrimeFaces streams images in two requests. During the page's `RENDER_RESPONSE` phase the bean returns empty content, and PrimeFaces only writes a URL. The browser then fetches that URL, and on that request the bean reads `itemId`, checks `AccessService.canViewItem()` for the session's user, and returns the bytes. The `itemId` is visible in the URL, so that check is what stops users from fetching each other's photos.
 
 - `getThumbnail()` serves the stored thumbnail (generating and saving it if missing), or the original if it is already small. Every list or grid view should use this.
 - `getImage()` serves the full-size original. Only the item detail page should use it.

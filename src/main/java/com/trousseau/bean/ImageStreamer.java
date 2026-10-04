@@ -1,6 +1,7 @@
 package com.trousseau.bean;
 
 import com.trousseau.model.ClothingItem;
+import com.trousseau.service.AccessService;
 import com.trousseau.service.ClothingItemService;
 import com.trousseau.util.ImageUtil;
 
@@ -19,6 +20,12 @@ public class ImageStreamer {
 
     @Inject
     private ClothingItemService clothingItemService;
+
+    @Inject
+    private AccessService accessService;
+
+    @Inject
+    private SessionBean sessionBean;
 
     /** Full-resolution photo. Use this only where the image is displayed large. */
     public StreamedContent getImage() {
@@ -63,7 +70,9 @@ public class ImageStreamer {
 
     /**
      * The itemId request parameter, or null when there is none, when it is malformed,
-     * or when this is the render pass.
+     * when this is the render pass, or when the current user may not see the item.
+     * The fetch URL carries the id in plain sight, so without the access check any
+     * signed-in user could page through everyone's photos by editing it.
      *
      * <p>PrimeFaces renders a streamed image in two passes: on RENDER_RESPONSE it only
      * emits the URL, and a second request actually fetches the bytes. Returning empty
@@ -78,10 +87,12 @@ public class ImageStreamer {
         if (param == null || param.trim().isEmpty()) {
             return null;
         }
+        Long itemId;
         try {
-            return Long.valueOf(param.trim());
+            itemId = Long.valueOf(param.trim());
         } catch (NumberFormatException e) {
             return null;
         }
+        return accessService.canViewItem(sessionBean.getCurrentUser(), itemId) ? itemId : null;
     }
 }
