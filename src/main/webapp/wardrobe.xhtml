@@ -78,10 +78,10 @@
                     <div class="card item-card">
                         <div class="card-image-wrapper">
                             <p:graphicImage value="#{imageStreamer.thumbnail}" styleClass="card-image"
-                                          rendered="#{item.imageData != null}">
+                                          rendered="#{item.hasImage}">
                                 <f:param name="itemId" value="#{item.id}" />
                             </p:graphicImage>
-                            <ui:fragment rendered="#{item.imageData == null}">
+                            <ui:fragment rendered="#{not item.hasImage}">
                                 <div class="card-image-placeholder">
                                     <i class="pi pi-image"></i>
                                 </div>

@@ -62,9 +62,20 @@ A password change must go through `User.changePasswordHash()`, which bumps the c
 
 ### Working with photos and BLOBs
 
-- Attach photos only through `ClothingItemService.attachImage()`, so that a thumbnail is always generated.
-- In any grid, card or list, use `#{imageStreamer.thumbnail}` with an `itemId` param. Reserve `#{imageStreamer.image}` for single large views.
-- **Never** return `ClothingItem` entities from a query that covers many items for reporting purposes. Project into a small class with `SELECT NEW …` (see `ItemWearStat`). Load BLOB bytes with a single-column query (`ClothingItemDao.loadImageData`).
+`ClothingItem`'s photo, thumbnail and receipt are `@Basic(fetch = LAZY)`, each in its own `@LazyGroup`. That is only real because the build **bytecode-enhances** the entities (`hibernate-maven-plugin` in `pom.xml`). Without enhancement, Hibernate silently loads all three with every item. That bug once made every signed-in session hold ~85 MB, and every save rewrite the bytes.
+
+- **Asking whether an item has a photo or receipt:** use `item.hasImage` / `item.hasReceipt`. They are `@Formula` columns computed by the database. Never write `item.imageData != null` in a page.
+- **Getting the bytes:** fetch by id with `ClothingItemService.getImageData(id)`, `getReceiptData(id)` or `getThumbnailData(id)`. Don't call `item.getImageData()` etc. on an item that came back from a service: its transaction has ended, so the lazy field can't load and the call throws.
+- **Setting bytes:** attach photos only through `ClothingItemService.attachImage()`, so a thumbnail is always generated. Saving another field never rewrites the bytes, because `ClothingItem` is `@DynamicUpdate` and unloaded lazy fields are left alone.
+- **Displaying:** in any grid, card or list, use `#{imageStreamer.thumbnail}` with an `itemId` param. Reserve `#{imageStreamer.image}` for the item page's full-size photo.
+- **Reports** over many items should still project into small classes with `SELECT NEW …` (see `ItemWearStat`), not return entities.
+- **`hibernate.version` in `pom.xml` must equal WildFly's Hibernate.** The enhancer runs at build time against that version, and the enhanced classes run on WildFly's copy.
+
+### PostgreSQL large objects
+
+On PostgreSQL each BLOB is a *large object*: the row holds only its id. Deleting a row or setting the column to null does **not** delete the object. `LargeObjectSweeper` removes objects that no `clothing_item` column references, a minute after startup and nightly, limited to objects owned by the app's database user.
+
+**If you add a `@Lob` column anywhere, extend the sweep's query first.** Until you do, the sweep detects the unknown `oid` column and refuses to run, because otherwise it would delete that column's data.
 
 ### Lazy loading
 
@@ -131,7 +142,7 @@ WildFly runs Hibernate in strict Jakarta Persistence compliance mode. Named quer
 
 ### Add a field to `ClothingItem`
 
-1. Add the field following [schema evolution](#schema-evolution).
+1. Add the field following [schema evolution](#schema-evolution). If it is large (bytes, long text), make it `@Basic(fetch = LAZY)` in its own `@LazyGroup`, and read it through a by-id service method as for photos (see [above](#working-with-photos-and-blobs)).
 2. Expose it in `wardrobe.xhtml` (add form), `bulk-add.xhtml` / `BulkAddBean.Draft` if relevant, and `clothing-detail.xhtml`.
 3. Add it to `DataExportImportService`, export and import. On import, read it with a default so older files still import. Bump `VERSION` and update [Export format](export-format.md).
 
@@ -164,21 +175,19 @@ Functional issues in the current code. Security issues are listed separately in 
 
 | # | Area | Problem | Suggested fix |
 |---|---|---|---|
-| 1 | **Memory** | **Pages that list items keep full `ClothingItem` entities, with photo, thumbnail and receipt bytes, in view-scoped beans.** `@Basic(fetch = LAZY)` has no effect without bytecode enhancement, so every list query loads every BLOB. Measured: about **85 MB retained per signed-in session** after the home, wardrobe and planner pages, for a wardrobe with one 6 MB photo and one 12 MB receipt. About ten such sessions exhaust the default 1 GB heap (`OutOfMemoryError`), and a realistic wardrobe of a hundred photos would exhaust it in one. Present before and after the Jakarta EE migration. | Move the BLOBs to their own entity (e.g. `ItemMedia`, `@OneToOne(fetch = LAZY)`), or enable Hibernate bytecode enhancement so `LAZY` is honoured; and make list pages use summary projections, as insights already do. |
-| 2 | Items | Deleting an item that belongs to any outfit or has been shared fails with a foreign-key violation (`outfit_items`, `share`). The user sees an error page. | In `ClothingItemService.delete()`, remove the item from outfits and delete its shares before removing it. Or block the delete with a friendly message suggesting Retire. |
-| 3 | Outfits | Deleting an outfit that has wear logs, planned days or shares fails the same way (`outfit_wear_log`, `planned_outfit`, `share`). Most outfits end up planned once the planner has been opened. | Delete `planned_outfit` and `share` rows first. Decide whether wear logs are deleted or the outfit is soft-deleted. |
-| 4 | Items | Name, category, colour, brand, size, description and wash threshold can't be edited after creation. `WardrobeBean.updateItem()` exists but no page uses it. | Add an edit form to `clothing-detail.xhtml`. |
-| 5 | Wardrobe | No tag filter in the UI, although `WardrobeBean.filterByTag()` exists. | Add a tag `selectOneMenu` using `tagConverter`. |
-| 6 | Wear tracking | Recording an outfit wear for a past date sets each item's `lastWornDate` to today. | Pass the date through `ClothingItemService.recordWear(item, date)` and keep the later of the two dates. |
-| 7 | Performance | `outfit-detail.xhtml` uses `#{imageStreamer.image}` (full size) for item tiles. | Switch to `#{imageStreamer.thumbnail}`. |
-| 8 | Performance | The signed-in home page builds `WardrobeBean` and `OutfitListBean` just to show three counts, loading every item with its tags. | Use `InsightsService` counts. |
-| 9 | Planner | The same outfit can be planned on several days of one week, and outfits that contain retired items are still suggested. | Penalise outfits already chosen this week; filter out outfits with retired items. |
-| 10 | Ratings | The outfit list's stars (mean of all ratings, truncated) can disagree with the detail page's Overall Average (mean of per-type averages). | Use one definition in both places. |
-| 11 | Seasons | The Winter range ends on 28 Feb, so 29 Feb wears in leap years are not counted in seasonal stats. | Use `YearMonth.of(year, 2).atEndOfMonth()`. |
-| 12 | i18n | `messages.properties` is registered as `#{msg}` in `faces-config.xml`, but no page uses it. All UI text is hard-coded in the XHTML. | Move strings to the bundle, or delete it. |
-| 13 | Uploads | Outside Docker, WildFly's default 10 MB request limit rejects bulk-add photos over 10 MB (the page allows 20 MB) and most data imports. | Documented in [Setup → Raise the upload limit](setup-and-deployment.md#raise-the-upload-limit); the Docker image sets 256 MB. |
-| 14 | Errors | Business-rule failures thrown as `IllegalArgumentException` from `@Stateless` services reach beans wrapped in `EJBException`, so the beans' `catch (IllegalArgumentException)` never matches and the user gets an HTTP 500 with a stack trace. Affects registering a taken username or email, sharing something twice, and creating a duplicate tag. Sharing with yourself is also allowed. | Throw an exception class annotated `@ApplicationException(rollback = true)`, which EJB passes through unwrapped, and catch that. Reject sharing with your own username. |
-| 15 | Images | When a photo is too small to need a thumbnail, `ImageStreamer.getThumbnail()` serves the original but always labels it `image/jpeg`, even for PNG/GIF/WebP. Browsers sniff and render it anyway. | Return the item's stored content type when serving the original. |
+| 1 | Items | Deleting an item that belongs to any outfit or has been shared fails with a foreign-key violation (`outfit_items`, `share`). The user sees an error page. | In `ClothingItemService.delete()`, remove the item from outfits and delete its shares before removing it. Or block the delete with a friendly message suggesting Retire. |
+| 2 | Outfits | Deleting an outfit that has wear logs, planned days or shares fails the same way (`outfit_wear_log`, `planned_outfit`, `share`). Most outfits end up planned once the planner has been opened. | Delete `planned_outfit` and `share` rows first. Decide whether wear logs are deleted or the outfit is soft-deleted. |
+| 3 | Items | Name, category, colour, brand, size, description and wash threshold can't be edited after creation. `WardrobeBean.updateItem()` exists but no page uses it. | Add an edit form to `clothing-detail.xhtml`. |
+| 4 | Wardrobe | No tag filter in the UI, although `WardrobeBean.filterByTag()` exists. | Add a tag `selectOneMenu` using `tagConverter`. |
+| 5 | Wear tracking | Recording an outfit wear for a past date sets each item's `lastWornDate` to today. | Pass the date through `ClothingItemService.recordWear(item, date)` and keep the later of the two dates. |
+| 6 | Performance | The signed-in home page builds `WardrobeBean` and `OutfitListBean` just to show three counts, loading every item with its tags. | Use `InsightsService` counts. |
+| 7 | Planner | The same outfit can be planned on several days of one week, and outfits that contain retired items are still suggested. | Penalise outfits already chosen this week; filter out outfits with retired items. |
+| 8 | Ratings | The outfit list's stars (mean of all ratings, truncated) can disagree with the detail page's Overall Average (mean of per-type averages). | Use one definition in both places. |
+| 9 | Seasons | The Winter range ends on 28 Feb, so 29 Feb wears in leap years are not counted in seasonal stats. | Use `YearMonth.of(year, 2).atEndOfMonth()`. |
+| 10 | i18n | `messages.properties` is registered as `#{msg}` in `faces-config.xml`, but no page uses it. All UI text is hard-coded in the XHTML. | Move strings to the bundle, or delete it. |
+| 11 | Uploads | On a WildFly you configured yourself, the default 10 MB request limit rejects bulk-add photos over 10 MB (the page allows 20 MB) and most data imports. | Raise `max-post-size` as in [Setup → Raise the upload limit](setup-and-deployment.md#raise-the-upload-limit). Docker and `mvn wildfly:run` already set 256 MB. |
+| 12 | Errors | Business-rule failures thrown as `IllegalArgumentException` from `@Stateless` services reach beans wrapped in `EJBException`, so the beans' `catch (IllegalArgumentException)` never matches and the user gets an HTTP 500 with a stack trace. Affects registering a taken username or email, sharing something twice, and creating a duplicate tag. Sharing with yourself is also allowed. | Throw an exception class annotated `@ApplicationException(rollback = true)`, which EJB passes through unwrapped, and catch that. Reject sharing with your own username. |
+| 13 | Images | When a photo is too small to need a thumbnail, `ImageStreamer.getThumbnail()` serves the original but always labels it `image/jpeg`, even for PNG/GIF/WebP. Browsers sniff and render it anyway. | Return the item's stored content type when serving the original. |
 
 ---
 

@@ -9,6 +9,20 @@ public final class AppConfig {
     }
 
     /**
+     * Whether LargeObjectSweeper may delete orphaned PostgreSQL large objects. On by
+     * default; set TROUSSEAU_LARGE_OBJECT_SWEEP=false (or the trousseau.large-object-sweep
+     * system property) when the database user is shared with other software that keeps
+     * its own large objects.
+     */
+    public static boolean largeObjectSweepEnabled() {
+        String value = System.getProperty("trousseau.large-object-sweep");
+        if (value == null || value.isBlank()) {
+            value = System.getenv("TROUSSEAU_LARGE_OBJECT_SWEEP");
+        }
+        return value == null || value.isBlank() || !value.trim().equalsIgnoreCase("false");
+    }
+
+    /**
      * The address users reach the app at, without a trailing slash, for example
      * {@code https://wardrobe.example.com/trousseau}. Used to build links in emails.
      *

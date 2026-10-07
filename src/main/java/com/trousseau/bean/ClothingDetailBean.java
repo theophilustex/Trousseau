@@ -220,10 +220,13 @@ public class ClothingDetailBean implements Serializable {
     public void uploadReceipt() {
         if (refuseUnlessOwner()) return;
         if (uploadedReceipt != null && uploadedReceipt.getContent() != null && uploadedReceipt.getContent().length > 0) {
-            item = clothingItemService.saveReceipt(item,
+            clothingItemService.saveReceipt(item,
                     uploadedReceipt.getContent(),
                     uploadedReceipt.getContentType(),
                     uploadedReceipt.getFileName());
+            // Reload rather than keep the merged copy: hasReceipt is computed by the
+            // database, and the copy would also carry the receipt bytes in view state.
+            item = clothingItemService.findById(itemId);
             uploadedReceipt = null;
             FacesContext.getCurrentInstance().addMessage(null,
                     new FacesMessage(FacesMessage.SEVERITY_INFO, "Receipt uploaded", null));
@@ -232,13 +235,17 @@ public class ClothingDetailBean implements Serializable {
 
     public void deleteReceipt() {
         if (refuseUnlessOwner()) return;
-        item = clothingItemService.deleteReceipt(item);
+        clothingItemService.deleteReceipt(item);
+        item = clothingItemService.findById(itemId);
         FacesContext.getCurrentInstance().addMessage(null,
                 new FacesMessage(FacesMessage.SEVERITY_INFO, "Receipt deleted", null));
     }
 
+    // Downloads fetch bytes by id: the item's own BLOB fields are lazy and must not be read
+    // once the transaction that loaded it has ended.
+
     public StreamedContent downloadReceipt() {
-        if (owner && item != null && item.getReceiptData() != null) {
+        if (owner && item != null && item.isHasReceipt()) {
             return DefaultStreamedContent.builder()
                     .stream(() -> new ByteArrayInputStream(clothingItemService.getReceiptData(item.getId())))
                     .contentType(item.getReceiptContentType())
@@ -249,21 +256,11 @@ public class ClothingDetailBean implements Serializable {
     }
 
     public StreamedContent downloadImage() {
-        if (item != null && item.getImageData() != null) {
+        if (item != null && item.isHasImage()) {
             return DefaultStreamedContent.builder()
-                    .stream(() -> new ByteArrayInputStream(item.getImageData()))
+                    .stream(() -> new ByteArrayInputStream(clothingItemService.getImageData(item.getId())))
                     .contentType(item.getImageContentType())
                     .name(item.getImageName())
-                    .build();
-        }
-        return new DefaultStreamedContent();
-    }
-
-    public StreamedContent getImageStreamedContent() {
-        if (item != null && item.getImageData() != null) {
-            return DefaultStreamedContent.builder()
-                    .stream(() -> new ByteArrayInputStream(item.getImageData()))
-                    .contentType(item.getImageContentType())
                     .build();
         }
         return new DefaultStreamedContent();

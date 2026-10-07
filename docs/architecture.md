@@ -49,7 +49,7 @@ flowchart TD
 | `dao` | `UserDao`, `ClothingItemDao`, `TagDao`, `OutfitDao`, `RatingDao`, `CommentDao`, `ShareDao`, `OutfitWearLogDao`, `PlannedOutfitDao` |
 | `filter` | `AuthFilter`: redirects unauthenticated requests to the login page |
 | `model` | **Entities**: `User`, `ClothingItem`, `Tag`, `Outfit`, `Rating`, `Comment`, `Share`, `OutfitWearLog`, `PlannedOutfit`<br/>**Enums**: `ItemStatus`, `RatingType`<br/>**Projections / value objects**: `ClothingItemSummary`, `ItemWearStat`, `CategoryWearStat`, `OutfitWearStat`, `MonthlyWearStat`, `DayForecast` |
-| `scheduler` | `WeeklyPlannerEmailScheduler` |
+| `scheduler` | `WeeklyPlannerEmailScheduler` (Sunday email), `LargeObjectSweeper` (orphaned photo/receipt cleanup) |
 | `service` | `UserService`, `AccessService`, `PasswordResetService`, `MailService`, `ClothingItemService`, `TagService`, `OutfitService`, `OutfitWearLogService`, `RatingService`, `CommentService`, `ShareService`, `InsightsService`, `WeeklyPlannerService`, `WeatherService`, `DataExportImportService` |
 | `util` | `PasswordUtil` (bcrypt), `ImageUtil` (thumbnails), `AppConfig` (public base URL from the environment) |
 
@@ -133,13 +133,20 @@ Algorithms are described in [How it works](how-it-works.md).
 
 ## Background jobs
 
-There is one: **`WeeklyPlannerEmailScheduler`**, a `@Singleton @Startup` EJB with
+**`WeeklyPlannerEmailScheduler`**, a `@Singleton @Startup` EJB with
 
 ```java
 @Schedule(dayOfWeek = "Sun", hour = "17", minute = "0", second = "0", persistent = false)
 ```
 
 For each user with an email address it calls `WeeklyPlannerService.getOrCreateWeekPlan(user, nextMonday)` and sends an inline-styled HTML email through `MailService` (the `java:jboss/mail/Default` session). Errors are caught per user. Operational details are in [Setup → Weekly email](setup-and-deployment.md#weekly-email-smtp).
+
+**`LargeObjectSweeper`** (`@Singleton @Startup`) deletes PostgreSQL large objects that no `clothing_item` column references. It runs once a minute after startup, through a single-action timer so a large backlog doesn't hold up deployment, and nightly at 03:30. Scope and safety:
+
+- It only considers objects whose owner is the app's database user (`current_user`).
+- It works in batches of 200, each auto-committed, so a big cleanup never becomes one long transaction. An object created by an upload that hasn't committed yet is invisible to it.
+- It does nothing on H2, where BLOBs live in the row, or when `TROUSSEAU_LARGE_OBJECT_SWEEP=false`.
+- It refuses to run if any `oid` column exists other than `clothing_item`'s three, so adding a new `@Lob` column can't turn it destructive.
 
 ---
 
@@ -162,7 +169,11 @@ These explain code that might otherwise look odd.
 
 **Never load BLOBs in list or aggregate queries.** `ClothingItem` holds the photo, thumbnail and receipt as `@Lob @Basic(fetch = LAZY)` columns. Pickers use `ClothingItemSummary` (id, name, category). Insights use `ItemWearStat` / `CategoryWearStat` / `OutfitWearStat` built with JPQL `SELECT NEW …`. BLOB bytes are fetched one column at a time with `SELECT c.imageData FROM ClothingItem c WHERE c.id = :id`. Without this, an insights page over a large wardrobe would pull every photo into memory.
 
-> ⚠️ **Only partly true today.** `fetch = LAZY` on a basic attribute is honoured only with Hibernate bytecode enhancement, which this build does not use. So any query returning `ClothingItem` entities loads all three BLOBs. The wardrobe, outfit and planner pages do this, and their view-scoped beans keep the results, which makes memory grow by tens of megabytes per session. See [Development → Known bugs](development.md#known-bugs), #1.
+**BLOBs are genuinely lazy, through bytecode enhancement.** `fetch = LAZY` on a basic attribute means nothing to Hibernate unless the entity class is enhanced, and before that was set up every query for items loaded every photo and receipt. List pages kept those in view state, about 85 MB per signed-in session in testing, and each save wrote the bytes back. The build now enhances entities (`hibernate-maven-plugin`, pinned to WildFly's Hibernate version). Each BLOB has its own `@LazyGroup`, and pages test `hasImage` / `hasReceipt`, which are `@Formula` columns computed in SQL, instead of the bytes. Measured after the change: about 0.1 MB per session.
+
+**Updates write only changed columns.** `ClothingItem` is `@DynamicUpdate`. On PostgreSQL, Hibernate stores each BLOB as a *large object*, and rewriting one creates a new object while orphaning the old one. Before this, every recorded wear or wash of an item duplicated its photo and receipt on disk.
+
+**Orphaned large objects are swept.** Even with the above, deleting a receipt or an item leaves its large objects behind, since PostgreSQL never deletes them with the row. `LargeObjectSweeper` removes unreferenced objects owned by the app's database user (see [Background jobs](#background-jobs)).
 
 **Thumbnails are stored, not computed per request.** A wardrobe page with 50 items would otherwise send 50 full-size photos to draw 200 px tiles. See [How it works → Photos](how-it-works.md#photos-and-thumbnails).
 

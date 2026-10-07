@@ -69,9 +69,9 @@ Named queries: `findByUsername`, `findByEmail`, `findAll`, `search` (case-insens
 | `category`, `color` | varchar(50) | category from a fixed list in `ClothingItemService.getCategories()`; colour is free text |
 | `brand` | varchar(100) | |
 | `size` | varchar(20) | |
-| `image_data` | LOB, lazy | original photo |
+| `image_data` | LOB, lazy (own lazy group) | original photo. On PostgreSQL an `oid` (large object). |
 | `image_content_type`, `image_name` | varchar | |
-| `thumbnail_data` | LOB, lazy | ≤ 400 px JPEG; null if the original is already small |
+| `thumbnail_data` | LOB, lazy (own lazy group) | ≤ 400 px JPEG; null if the original is already small |
 | `wear_count` | int | lifetime wears |
 | `wears_since_wash` | int, **nullable** | `NULL` reads as 0 |
 | `wash_after_wears` | int | default 3; 0 disables wash alerts |
@@ -82,7 +82,8 @@ Named queries: `findByUsername`, `findByEmail`, `findAll`, `search` (case-insens
 | `status` | varchar(20), **nullable** | `ItemStatus` name; `NULL` reads as `ACTIVE` |
 | `retired_on` | date | set when retired, cleared on reactivate |
 | `retired_note` | varchar(200) | |
-| `receipt_data` | LOB, lazy | image or PDF |
+| `receipt_data` | LOB, lazy (own lazy group) | image or PDF |
+| *`hasImage`*, *`hasReceipt`* | computed | `@Formula`: `image_data IS NOT NULL` / `receipt_data IS NOT NULL`, evaluated by the database so pages can test for a photo without loading it. Not columns. |
 | `receipt_content_type`, `receipt_name` | varchar | |
 | `created_at` | timestamp | |
 

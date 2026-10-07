@@ -5,6 +5,10 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import org.hibernate.annotations.DynamicUpdate;
+import org.hibernate.annotations.Formula;
+import org.hibernate.annotations.LazyGroup;
+
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -42,6 +46,18 @@ import java.util.Set;
         query = "SELECT DISTINCT c FROM ClothingItem c LEFT JOIN FETCH c.tags WHERE :tag MEMBER OF c.tags "
               + "AND (c.status IS NULL OR c.status = com.trousseau.model.ItemStatus.ACTIVE)")
 })
+/*
+ * Photo, thumbnail and receipt are large and stored in the row, so they are lazy, each
+ * in its own lazy group. That works only because the build bytecode-enhances entities
+ * (hibernate-maven-plugin in pom.xml); without enhancement Hibernate silently loads them
+ * with every item. Pages ask hasImage / hasReceipt, which are computed in SQL, and code
+ * that needs bytes fetches them by id through ClothingItemService.
+ *
+ * @DynamicUpdate makes an update write only the columns that changed. Recording a wear
+ * must never rewrite a photo: on PostgreSQL each rewrite creates a new large object and
+ * orphans the old one.
+ */
+@DynamicUpdate
 @Getter @Setter
 @EqualsAndHashCode(of = "id")
 @ToString(of = {"id", "name", "category"})
@@ -85,8 +101,14 @@ public class ClothingItem implements Serializable {
 
     @Lob
     @Basic(fetch = FetchType.LAZY)
+    @LazyGroup("image")
     @Column(name = "image_data")
     private byte[] imageData;
+
+    /** Whether a photo is stored, computed by the database without reading it. */
+    @Formula("(image_data IS NOT NULL)")
+    @Setter(lombok.AccessLevel.NONE)
+    private boolean hasImage;
 
     @Column(name = "image_content_type", length = 100)
     private String imageContentType;
@@ -102,6 +124,7 @@ public class ClothingItem implements Serializable {
      */
     @Lob
     @Basic(fetch = FetchType.LAZY)
+    @LazyGroup("thumbnail")
     @Column(name = "thumbnail_data")
     private byte[] thumbnailData;
 
@@ -153,8 +176,14 @@ public class ClothingItem implements Serializable {
 
     @Lob
     @Basic(fetch = FetchType.LAZY)
+    @LazyGroup("receipt")
     @Column(name = "receipt_data")
     private byte[] receiptData;
+
+    /** Whether a receipt is stored, computed by the database without reading it. */
+    @Formula("(receipt_data IS NOT NULL)")
+    @Setter(lombok.AccessLevel.NONE)
+    private boolean hasReceipt;
 
     @Column(name = "receipt_content_type", length = 100)
     private String receiptContentType;

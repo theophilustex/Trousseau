@@ -34,12 +34,15 @@ public class ImageStreamer {
             return new DefaultStreamedContent();
         }
 
+        // Bytes by id: the item's own imageData is lazy and must not be read once the
+        // transaction that loaded it has ended.
         ClothingItem item = clothingItemService.findById(itemId);
-        if (item == null || item.getImageData() == null) {
+        byte[] data = item == null ? null : clothingItemService.getImageData(itemId);
+        if (data == null || data.length == 0) {
             return new DefaultStreamedContent();
         }
         return DefaultStreamedContent.builder()
-                .stream(() -> new ByteArrayInputStream(item.getImageData()))
+                .stream(() -> new ByteArrayInputStream(data))
                 .contentType(item.getImageContentType())
                 .name(item.getImageName())
                 .build();

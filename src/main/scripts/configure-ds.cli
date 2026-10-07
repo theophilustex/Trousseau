@@ -1,1 +1,8 @@
+# Used by `mvn wildfly:run` for local development (see docs/setup-and-deployment.md).
+
+# Keep data in an H2 file instead of WildFly's default in-memory database.
 /subsystem=datasources/data-source=ExampleDS:write-attribute(name=connection-url,value="jdbc:h2:file:~/.trousseau/trousseau;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1")
+
+# Match the Docker image's 256 MB request limit. WildFly's default of 10 MB rejects
+# bulk-add photos over 10 MB and most data imports.
+/subsystem=undertow/server=default-server/http-listener=default:write-attribute(name=max-post-size,value=268435456)

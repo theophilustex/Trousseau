@@ -49,13 +49,13 @@
                     <div class="outfit-items-gallery">
                         <ui:repeat value="#{outfitDetailBean.outfit.items}" var="outfitItem">
                             <div class="outfit-item-card">
-                                <p:graphicImage value="#{imageStreamer.image}"
+                                <p:graphicImage value="#{imageStreamer.thumbnail}"
                                               styleClass="gallery-image"
-                                              rendered="#{outfitItem.imageData != null}">
+                                              rendered="#{outfitItem.hasImage}">
                                     <f:param name="itemId" value="#{outfitItem.id}" />
                                 </p:graphicImage>
                                 <div class="gallery-placeholder"
-                                     rendered="#{outfitItem.imageData == null}">
+                                     rendered="#{not outfitItem.hasImage}">
                                     <i class="pi pi-image"></i>
                                 </div>
                                 <div class="outfit-item-info">

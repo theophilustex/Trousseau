@@ -45,8 +45,15 @@ public class ClothingItemService {
         return item;
     }
 
-    /** Builds the thumbnail if there is a photo but no scaled copy yet. */
+    /**
+     * Builds the thumbnail for a new item that arrives with a photo but no scaled copy
+     * (an import). Existing items are skipped: their photo is lazy and not loaded, and
+     * they get a thumbnail through attachImage() or the backfill in getThumbnailData().
+     */
     private void ensureThumbnail(ClothingItem item) {
+        if (item.getId() != null) {
+            return;
+        }
         if (item.getImageData() != null && item.getImageData().length > 0 && !item.hasThumbnail()) {
             item.setThumbnailData(ImageUtil.createThumbnail(item.getImageData()));
         }

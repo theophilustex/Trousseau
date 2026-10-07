@@ -38,6 +38,7 @@ All settings go in `.env` next to `docker-compose.yml`. `.env` is git-ignored be
 | `DB_NAME`, `DB_USER` | `trousseau` | Database name and user |
 | `TROUSSEAU_PORT` | `8473` | Host port. The app is at `http://<host>:<port>/trousseau/`. |
 | `TROUSSEAU_BASE_URL` | *(unset)* | The address people use to reach the app, e.g. `https://wardrobe.example.com/trousseau`. Used for links in emails. **Password reset is off until this is set.** |
+| `TROUSSEAU_LARGE_OBJECT_SWEEP` | `true` | Remove orphaned photo/receipt data from PostgreSQL a minute after start and nightly (see [Disk space](#disk-space)). Set `false` only if the database user is shared with other software that keeps large objects. |
 | `TZ` | `UTC` | Timezone for the Sunday 17:00 email and for "today" in the app (e.g. `Europe/London`) |
 | `JAVA_MAX_HEAP` | `1g` | Maximum JVM heap. Data imports are read into memory, so raise this for large wardrobes. |
 | `MAX_UPLOAD_BYTES` | `268435456` (256 MB) | Largest accepted HTTP request. Applies to photo uploads and data imports. |
@@ -85,6 +86,24 @@ docker compose up -d
 ```
 
 Users can also take their own portable backups from **Data → Download Export**.
+
+### Disk space
+
+On PostgreSQL, photos and receipts are stored as *large objects*. Versions before this fix leaked them: every recorded wear, wash or other save of an item wrote a new copy of its photo, thumbnail and receipt, and left the old copy behind. Deleting a receipt or an item still leaves its large objects behind, as PostgreSQL never removes them with the row.
+
+The app cleans these up itself. About a minute after it starts, and nightly at 03:30, it deletes large objects that no item refers to, limited to ones owned by its own database user. The log reports each cleanup:
+
+```
+INFO  [com.trousseau.scheduler.LargeObjectSweeper] Large-object sweep removed 453 orphaned photo/receipt object(s)
+```
+
+The first start after upgrading may remove a lot, if your database is old. PostgreSQL then reuses the freed space, but the data files don't shrink on their own. To give the space back to the host after a big first cleanup:
+
+```bash
+docker compose exec db psql -U trousseau trousseau -c "VACUUM FULL pg_largeobject"
+```
+
+This locks the photo storage while it runs, so do it when nobody is using the app. It needs a PostgreSQL superuser, which the Compose setup's database user is; on a database you manage yourself, run it as `postgres`. To see how much space photos take: `docker compose exec db psql -U trousseau trousseau -c "SELECT pg_size_pretty(pg_total_relation_size('pg_largeobject'))"`.
 
 ### Upgrades
 

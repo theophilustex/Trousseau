@@ -41,17 +41,17 @@
                         <div class="detail-image-wrapper">
                             <p:graphicImage value="#{imageStreamer.image}"
                                           styleClass="detail-image"
-                                          rendered="#{clothingDetailBean.item.imageData != null}">
+                                          rendered="#{clothingDetailBean.item.hasImage}">
                                 <f:param name="itemId" value="#{clothingDetailBean.item.id}" />
                             </p:graphicImage>
-                            <ui:fragment rendered="#{clothingDetailBean.item.imageData == null}">
+                            <ui:fragment rendered="#{not clothingDetailBean.item.hasImage}">
                                 <div class="detail-image-placeholder">
                                     <i class="pi pi-image"></i>
                                     <p>No image uploaded</p>
                                 </div>
                             </ui:fragment>
                         </div>
-                        <div class="image-actions" rendered="#{clothingDetailBean.item.imageData != null}">
+                        <div class="image-actions" rendered="#{clothingDetailBean.item.hasImage}">
                             <p:commandButton value="Download Image" icon="pi pi-download"
                                            ajax="false" styleClass="btn btn-outline">
                                 <p:fileDownload value="#{clothingDetailBean.downloadImage()}" />
@@ -230,7 +230,7 @@
 
                         <!-- Receipt Panel -->
                         <p:panel header="Receipt" styleClass="detail-panel" rendered="#{clothingDetailBean.owner}">
-                            <ui:fragment rendered="#{clothingDetailBean.item.receiptData != null}">
+                            <ui:fragment rendered="#{clothingDetailBean.item.hasReceipt}">
                                 <div class="receipt-info">
                                     <i class="pi pi-file"></i>
                                     <span class="receipt-name">#{clothingDetailBean.item.receiptName}</span>
@@ -246,7 +246,7 @@
                                                    styleClass="btn btn-danger btn-sm" />
                                 </div>
                             </ui:fragment>
-                            <ui:fragment rendered="#{clothingDetailBean.item.receiptData == null}">
+                            <ui:fragment rendered="#{not clothingDetailBean.item.hasReceipt}">
                                 <p class="receipt-empty">No receipt uploaded yet.</p>
                                 <div class="receipt-upload">
                                     <p:fileUpload value="#{clothingDetailBean.uploadedReceipt}"

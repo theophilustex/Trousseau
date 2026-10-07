@@ -69,13 +69,13 @@
 
                         <p:column headerText="Item">
                             <div class="laundry-item">
-                                <ui:fragment rendered="#{item.imageData != null}">
+                                <ui:fragment rendered="#{item.hasImage}">
                                     <p:graphicImage value="#{imageStreamer.thumbnail}"
                                                     styleClass="laundry-thumb">
                                         <f:param name="itemId" value="#{item.id}" />
                                     </p:graphicImage>
                                 </ui:fragment>
-                                <ui:fragment rendered="#{item.imageData == null}">
+                                <ui:fragment rendered="#{not item.hasImage}">
                                     <div class="laundry-thumb-placeholder"><i class="pi pi-image"></i></div>
                                 </ui:fragment>
                                 <div class="laundry-item-text">

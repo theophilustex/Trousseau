@@ -22,6 +22,10 @@
 
         <!-- Keep in step with the Dockerfile's WILDFLY_VERSION. -->
         <wildfly.version>41.0.1.Final</wildfly.version>
+        <!-- Must equal the Hibernate ORM version inside that WildFly (modules/system/
+             layers/base/org/hibernate/main): entities are bytecode-enhanced against it at
+             build time and run on it at deploy time. -->
+        <hibernate.version>7.4.5.Final</hibernate.version>
         <lombok.version>1.18.48</lombok.version>
     </properties>
 
@@ -32,6 +36,15 @@
             <groupId>jakarta.platform</groupId>
             <artifactId>jakarta.jakartaee-api</artifactId>
             <version>11.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Hibernate-specific mapping annotations (@LazyGroup, @Formula, @DynamicUpdate).
+             Provided: WildFly supplies Hibernate ORM at runtime. -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <version>${hibernate.version}</version>
             <scope>provided</scope>
         </dependency>
 
@@ -85,6 +98,26 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <!-- Bytecode enhancement, so that @Basic(fetch = LAZY) on ClothingItem's photo,
+                 thumbnail and receipt is honoured. Without it Hibernate loads every BLOB
+                 with every item, and list pages held them in session state (~85 MB per
+                 session in testing). -->
+            <plugin>
+                <groupId>org.hibernate.orm</groupId>
+                <artifactId>hibernate-maven-plugin</artifactId>
+                <version>${hibernate.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>enhance</goal>
+                        </goals>
+                        <!-- Lazy initialization and dirty tracking are always on when
+                             enhancing in Hibernate 7 (their switches are deprecated,
+                             HHH-15641). Association management and extended enhancement
+                             stay at their default, off. -->
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

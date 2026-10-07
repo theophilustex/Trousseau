@@ -45,7 +45,7 @@ mvn clean package wildfly:run
 The `wildfly-maven-plugin` then:
 
 1. Downloads and provisions **WildFly 41.0.1.Final** into `target/server` (first run after a `clean`, ~270 MB).
-2. Runs [`src/main/scripts/configure-ds.cli`](../src/main/scripts/configure-ds.cli). This repoints WildFly's built-in `ExampleDS` datasource from an in-memory H2 database to a file:
+2. Runs [`src/main/scripts/configure-ds.cli`](../src/main/scripts/configure-ds.cli). This raises the request limit to 256 MB, as in Docker, and repoints WildFly's built-in `ExampleDS` datasource from an in-memory H2 database to a file:
    ```
    jdbc:h2:file:~/.trousseau/trousseau;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1
    ```
@@ -230,7 +230,9 @@ Trousseau has no external configuration file. Settings live in the deployment de
 | SQL logging | `persistence.xml` → `hibernate.show_sql` | `false` | |
 | WildFly version | `pom.xml` → `wildfly.version`, and `Dockerfile` → `WILDFLY_VERSION` / `WILDFLY_SHA256` | `41.0.1.Final` | Keep the two in step |
 | Public base URL | `TROUSSEAU_BASE_URL` env var or `trousseau.base-url` system property | unset (password reset off) | See [Password reset emails](#password-reset-emails) |
-| Max request size | Undertow `http-listener` → `max-post-size` | 10 MB (WildFly default) | Raise it; see [Raise the upload limit](#raise-the-upload-limit). The Docker image defaults to 256 MB. |
+| Orphaned large-object sweep | `TROUSSEAU_LARGE_OBJECT_SWEEP` env var or `trousseau.large-object-sweep` system property | on | PostgreSQL only. Set `false` if the database user is shared with other software that stores large objects. See [Docker → Disk space](docker.md#disk-space). |
+| Hibernate version for build-time enhancement | `pom.xml` → `hibernate.version` | `7.4.5.Final` | Must equal the Hibernate ORM bundled in WildFly |
+| Max request size | Undertow `http-listener` → `max-post-size` | 10 MB (WildFly default) | Raise it; see [Raise the upload limit](#raise-the-upload-limit). The Docker image and `mvn wildfly:run` set 256 MB. |
 
 ### Code constants
 
@@ -262,7 +264,7 @@ All state is in the database, including photos and receipts, which are stored as
 | Database | Backup method |
 |---|---|
 | H2 | Stop the server and copy `~/.trousseau/trousseau.mv.db`. Or, while running, use H2's `BACKUP TO 'file.zip'` SQL command over a JDBC connection. |
-| PostgreSQL | `pg_dump -Fc trousseau > trousseau.dump` |
+| PostgreSQL | `pg_dump -Fc trousseau > trousseau.dump` (`pg_dump` includes large objects, where photos live) |
 
 Users can also take their own backups with **Data → Download Export**. This is portable across instances but does not include ratings, comments, shares or planner weeks.
 
@@ -277,6 +279,10 @@ Users can also take their own backups with **Data → Download Export**. This is
 The entities are written so that rows from older versions still load after new columns are added. For example, a `NULL` `status` reads as `ACTIVE` and a `NULL` `wears_since_wash` reads as 0. Thumbnails for photos uploaded before thumbnails existed are generated the first time each one is displayed.
 
 `hbm2ddl=update` cannot rename or drop columns, change types or migrate data. A release that needs any of those must ship a manual SQL migration.
+
+### Orphaned photo data (PostgreSQL)
+
+Older versions left a copy of an item's photo, thumbnail and receipt behind in PostgreSQL every time the item was saved. On first start, the app deletes these orphans (see [Docker → Disk space](docker.md#disk-space)), including how to shrink the database files afterwards. Back up before upgrading in any case.
 
 ### From the Java EE 8 version (WildFly 26) to Jakarta EE 11 (WildFly 41)
 

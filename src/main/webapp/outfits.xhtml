@@ -90,10 +90,10 @@
                                     <div class="outfit-thumb">
                                         <p:graphicImage value="#{imageStreamer.thumbnail}"
                                                       styleClass="thumb-image"
-                                                      rendered="#{outfitItem.imageData != null}">
+                                                      rendered="#{outfitItem.hasImage}">
                                             <f:param name="itemId" value="#{outfitItem.id}" />
                                         </p:graphicImage>
-                                        <ui:fragment rendered="#{outfitItem.imageData == null}">
+                                        <ui:fragment rendered="#{not outfitItem.hasImage}">
                                             <div class="thumb-placeholder">
                                                 <i class="pi pi-image"></i>
                                             </div>
