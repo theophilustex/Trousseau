@@ -1,6 +1,6 @@
 # Trousseau + PostgreSQL. Copy .env.example to .env, set DB_PASSWORD, then:
 #
-#   docker compose up -d --build
+#   docker compose up -d
 #
 # The app is then at http://localhost:8473/trousseau/ (or TROUSSEAU_PORT).
 # All data, photos included, lives in the db-data volume. See docs/docker.md.
@@ -9,8 +9,8 @@ name: trousseau
 
 services:
   app:
-    build: .
-    image: trousseau:latest
+    image: ghcr.io/theophilustex/trousseau:latest
+    # build: . # Uncomment to build locally from source instead of pulling from GHCR
     restart: unless-stopped
     depends_on:
       db:

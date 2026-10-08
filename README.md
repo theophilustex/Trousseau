@@ -24,10 +24,21 @@ It is a Jakarta EE 11 application (Jakarta Faces with PrimeFaces, Jakarta Persis
 
 Prerequisite: Docker with the Compose plugin.
 
+**Option A — Without cloning (quickest):**
+```bash
+mkdir trousseau && cd trousseau
+curl -fsSL https://raw.githubusercontent.com/theophilustex/Trousseau/main/docker-compose.yml -o docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/theophilustex/Trousseau/main/.env.example -o .env
+# edit .env to set DB_PASSWORD (and optionally TZ)
+docker compose up -d
+```
+
+**Option B — From repository:**
 ```bash
 cp .env.example .env        # then set DB_PASSWORD (and TZ)
-docker compose up -d --build
+docker compose up -d
 ```
+*(To build from source instead of pulling from GHCR, uncomment `build: .` in `docker-compose.yml` or run `docker compose up -d --build`)*.
 
 Open **http://localhost:8473/trousseau/** and register an account. This runs WildFly with PostgreSQL. Data persists in a Docker volume. Configuration, email, backups and reverse-proxy setup are covered in [Running with Docker Compose](docs/docker.md).
 
