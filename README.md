@@ -43,26 +43,31 @@ Trousseau/
 
 ---
 
-## 🚀 Quick Start (Self-Hosting with Docker)
+## 🚀 Quick Start (Self-Hosting without Cloning the Repo)
 
-### 1. Run with Docker Compose
-Clone the repository and run:
+Users do **not** need to clone the repository to run Trousseau. Pre-built multi-architecture (`linux/amd64` and `linux/arm64`) Docker images are published to GitHub Container Registry.
+
+### Method 1: Download `docker-compose.yml` (Recommended)
+Create a directory, grab the single `docker-compose.yml` file, and start:
 
 ```bash
-docker compose up -d --build
+mkdir trousseau && cd trousseau
+curl -O https://raw.githubusercontent.com/theophilustex/Trousseau/main/docker-compose.yml
+docker compose up -d
 ```
 
-Access the web interface at **`http://localhost:4000`**.
-
-### 2. Configuration
-Data and uploaded photos are stored in `./data`. You can customize environment variables in `docker-compose.yml` or `.env`:
-
-```env
-PORT=4000
-HOST=0.0.0.0
-DATA_DIR=/app/data
-JWT_SECRET=your_random_secure_secret_string
+### Method 2: Single `docker run` Command
+```bash
+docker run -d \
+  --name trousseau \
+  -p 4000:4000 \
+  -v $(pwd)/data:/app/data \
+  -e JWT_SECRET=change_me_to_a_random_secure_secret_string \
+  --restart unless-stopped \
+  ghcr.io/theophilustex/trousseau:latest
 ```
+
+Access the application in your browser at **`http://localhost:4000`**. Data and photos persist in `./data`.
 
 ---
 

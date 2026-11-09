@@ -1,9 +1,10 @@
 services:
   trousseau:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: trousseau:latest
+    image: ghcr.io/theophilustex/trousseau:latest
+    # To build locally from source instead of pulling pre-built image:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     container_name: trousseau
     restart: unless-stopped
     ports:
