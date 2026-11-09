@@ -1,0 +1,17 @@
+{
+  "name": "trousseau-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @trousseau/server --filter @trousseau/web run dev",
+    "dev:server": "pnpm --filter @trousseau/server run dev",
+    "dev:web": "pnpm --filter @trousseau/web run dev",
+    "dev:mobile": "pnpm --filter @trousseau/mobile run start",
+    "build": "pnpm --recursive run build",
+    "lint": "pnpm --recursive run lint",
+    "test": "pnpm --recursive run test"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

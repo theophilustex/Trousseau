@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Trousseau",
+    "slug": "trousseau-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1c1917"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.trousseau.app"
+    },
+    "android": {
+      "package": "com.trousseau.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1c1917"
+      },
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Trousseau to access your camera to photograph clothing items."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Trousseau to access your photos to catalog clothes."
+        }
+      ]
+    ]
+  }
+}
