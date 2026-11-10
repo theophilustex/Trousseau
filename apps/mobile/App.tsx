@@ -41,10 +41,11 @@ interface Outfit {
   itemIds: string[];
 }
 
+import * as SecureStore from 'expo-secure-store';
 import { formatTemp, type TemperatureUnit } from '@trousseau/shared';
 
 export default function App() {
-  const [serverUrl, setServerUrl] = useState('http://10.0.2.2:4000'); // Default emulator localhost or LAN IP
+  const [serverUrl, setServerUrl] = useState('');
   const [token, setToken] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -67,11 +68,31 @@ export default function App() {
   // Swap modal
   const [isSwapModalVisible, setIsSwapModalVisible] = useState(false);
 
-  const apiRequest = async (path: string, options: any = {}) => {
-    const cleanUrl = serverUrl.replace(/\/+$/, '');
+  // Auto-restore session from device storage on launch
+  useEffect(() => {
+    (async () => {
+      try {
+        const savedUrl = await SecureStore.getItemAsync('trousseau_server_url');
+        if (savedUrl) setServerUrl(savedUrl);
+        const savedToken = await SecureStore.getItemAsync('trousseau_token');
+        if (savedToken && savedUrl) {
+          setToken(savedToken);
+          setIsConnected(true);
+          await loadDashboardData(savedToken, savedUrl);
+        }
+      } catch {
+        // Fallback gracefully to login screen
+      }
+    })();
+  }, []);
+
+  const apiRequest = async (path: string, options: any = {}, overrideToken?: string, overrideUrl?: string) => {
+    const activeUrl = overrideUrl || serverUrl;
+    const cleanUrl = activeUrl.replace(/\/+$/, '');
+    const activeToken = overrideToken || token;
     const headers = {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
       ...(options.headers || {})
     };
 
@@ -89,6 +110,10 @@ export default function App() {
   };
 
   const handleLogin = async () => {
+    if (!serverUrl.trim()) {
+      Alert.alert('Required', 'Please enter your Trousseau server URL (e.g. http://192.168.1.50:4000).');
+      return;
+    }
     if (!username.trim() || !password.trim()) {
       Alert.alert('Required', 'Please enter your username and password.');
       return;
@@ -106,6 +131,8 @@ export default function App() {
 
       setToken(data.token);
       setIsConnected(true);
+      await SecureStore.setItemAsync('trousseau_server_url', serverUrl.trim());
+      await SecureStore.setItemAsync('trousseau_token', data.token);
       await loadDashboardData(data.token);
     } catch (err: any) {
       Alert.alert('Connection Failed', err.message || 'Unable to connect to your Trousseau server.');
@@ -114,11 +141,24 @@ export default function App() {
     }
   };
 
-  const loadDashboardData = async (authToken?: string) => {
+  const handleLogout = async () => {
+    try {
+      await SecureStore.deleteItemAsync('trousseau_token');
+    } catch {
+      // ignore
+    }
+    setToken('');
+    setIsConnected(false);
+  };
+
+  const loadDashboardData = async (authToken?: string, serverUrlOverride?: string) => {
     setIsLoading(true);
     try {
+      const activeToken = authToken || token;
+      const activeUrl = serverUrlOverride || serverUrl;
+
       // 1. Fetch weather
-      const weatherRes = await apiRequest('/api/weather/current').catch(() => ({
+      const weatherRes = await apiRequest('/api/weather/current', {}, activeToken, activeUrl).catch(() => ({
         forecast: {
           tempCurrentC: 21,
           tempHighC: 24,
@@ -130,14 +170,14 @@ export default function App() {
       setWeather(weatherRes.forecast);
 
       // 2. Fetch today's plan
-      const todayRes = await apiRequest('/api/wear-logs/today');
+      const todayRes = await apiRequest('/api/wear-logs/today', {}, activeToken, activeUrl);
       setTodayLogId(todayRes.log?.id || null);
       setIsWornToday(todayRes.log?.status === 'worn');
 
       // 3. Fetch recommendations & all outfits
       const [recsRes, outfitsRes] = await Promise.all([
-        apiRequest('/api/recommendations'),
-        apiRequest('/api/outfits')
+        apiRequest('/api/recommendations', {}, activeToken, activeUrl),
+        apiRequest('/api/outfits', {}, activeToken, activeUrl)
       ]);
 
       setAllOutfits(outfitsRes.outfits || []);
@@ -248,6 +288,9 @@ export default function App() {
               autoCapitalize="none"
               autoCorrect={false}
             />
+            <Text style={{ fontSize: 11, color: '#78716c', marginTop: 4 }}>
+              Enter your self-hosted URL (e.g. http://192.168.1.X:4000 for local Wi-Fi, or https://yourdomain.com).
+            </Text>
           </View>
 
           <View style={styles.inputGroup}>
@@ -400,12 +443,26 @@ export default function App() {
           </View>
         )}
 
-        <TouchableOpacity
-          style={styles.refreshButton}
-          onPress={() => loadDashboardData()}
-        >
-          <Text style={styles.refreshText}>↻ Sync with Server</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 10 }}>
+          <TouchableOpacity
+            style={styles.refreshButton}
+            onPress={() => loadDashboardData()}
+          >
+            <Text style={[styles.refreshText, isDark && styles.subtextDark]}>↻ Sync</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.refreshButton}
+            onPress={() => {
+              Alert.alert('Disconnect', 'Do you want to disconnect and switch servers?', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Disconnect', style: 'destructive', onPress: handleLogout }
+              ]);
+            }}
+          >
+            <Text style={[styles.refreshText, { color: '#ef4444' }]}>🚪 Change Server</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       {/* Outfit Swapper Modal */}
