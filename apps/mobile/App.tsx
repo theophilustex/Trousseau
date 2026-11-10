@@ -41,11 +41,17 @@ interface Outfit {
   itemIds: string[];
 }
 
+import { formatTemp, type TemperatureUnit } from '@trousseau/shared';
+
 export default function App() {
   const [serverUrl, setServerUrl] = useState('http://10.0.2.2:4000'); // Default emulator localhost or LAN IP
   const [token, setToken] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // User preferences
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [tempUnit, setTempUnit] = useState<TemperatureUnit>('C');
 
   // Auth inputs
   const [username, setUsername] = useState('');
@@ -283,32 +289,51 @@ export default function App() {
   }
 
   const cleanBase = serverUrl.replace(/\/+$/, '');
+  const isDark = theme === 'dark';
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={[styles.container, isDark && styles.containerDark]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, isDark && styles.headerDark]}>
         <View>
-          <Text style={styles.headerTitle}>Trousseau</Text>
-          <Text style={styles.headerDate}>
+          <Text style={[styles.headerTitle, isDark && styles.textDark]}>Trousseau</Text>
+          <Text style={[styles.headerDate, isDark && styles.subtextDark]}>
             {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
           </Text>
         </View>
 
-        {weather && (
-          <View style={styles.weatherBadge}>
-            <Text style={styles.weatherTemp}>{weather.tempCurrentC}°C</Text>
-            <Text style={styles.weatherDesc}>{weather.description}</Text>
-          </View>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {/* Temperature unit switcher */}
+          <TouchableOpacity
+            style={[styles.toggleBtn, isDark && styles.toggleBtnDark]}
+            onPress={() => setTempUnit((prev) => (prev === 'C' ? 'F' : 'C'))}
+          >
+            <Text style={[styles.toggleBtnText, isDark && styles.toggleBtnTextDark]}>°{tempUnit}</Text>
+          </TouchableOpacity>
+
+          {/* Theme switcher */}
+          <TouchableOpacity
+            style={[styles.toggleBtn, isDark && styles.toggleBtnDark]}
+            onPress={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
+          >
+            <Text style={{ fontSize: 13 }}>{isDark ? '☀️' : '🌙'}</Text>
+          </TouchableOpacity>
+
+          {weather && (
+            <View style={styles.weatherBadge}>
+              <Text style={styles.weatherTemp}>{formatTemp(weather.tempCurrentC, tempUnit)}</Text>
+              <Text style={styles.weatherDesc}>{weather.description}</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Main Outfit Card */}
         {todayOutfit ? (
-          <View style={styles.outfitCard}>
+          <View style={[styles.outfitCard, isDark && styles.cardDark]}>
             <View style={styles.outfitHeader}>
               <View style={styles.occasionBadge}>
                 <Text style={styles.occasionText}>{todayOutfit.occasion}</Text>
@@ -320,12 +345,12 @@ export default function App() {
               )}
             </View>
 
-            <Text style={styles.outfitName}>{todayOutfit.name}</Text>
+            <Text style={[styles.outfitName, isDark && styles.textDark]}>{todayOutfit.name}</Text>
 
             {/* Items Grid */}
             <View style={styles.itemsGrid}>
               {todayOutfit.items?.map((item) => (
-                <View key={item.id} style={styles.itemBox}>
+                <View key={item.id} style={[styles.itemBox, isDark && styles.itemBoxDark]}>
                   {item.thumbnailUrl ? (
                     <Image
                       source={{ uri: `${cleanBase}${item.thumbnailUrl}` }}
@@ -337,8 +362,8 @@ export default function App() {
                       <Text style={styles.placeholderText}>{item.category}</Text>
                     </View>
                   )}
-                  <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                  <Text style={styles.itemWears}>
+                  <Text style={[styles.itemName, isDark && styles.textDark]} numberOfLines={1}>{item.name}</Text>
+                  <Text style={[styles.itemWears, isDark && styles.subtextDark]}>
                     {item.wearsSinceWash}/{item.maxWearsBeforeWash} wears
                   </Text>
                 </View>
@@ -362,16 +387,16 @@ export default function App() {
               )}
 
               <TouchableOpacity
-                style={styles.swapButton}
+                style={[styles.swapButton, isDark && { backgroundColor: '#292524', borderColor: '#3b3533' }]}
                 onPress={() => setIsSwapModalVisible(true)}
               >
-                <Text style={styles.swapButtonText}>Swap Outfit</Text>
+                <Text style={[styles.swapButtonText, isDark && styles.textDark]}>Swap Outfit</Text>
               </TouchableOpacity>
             </View>
           </View>
         ) : (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>No outfit scheduled for today.</Text>
+          <View style={[styles.emptyCard, isDark && styles.cardDark]}>
+            <Text style={[styles.emptyText, isDark && styles.subtextDark]}>No outfit scheduled for today.</Text>
           </View>
         )}
 
@@ -735,5 +760,46 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#78716c',
     marginTop: 2
+  },
+  headerDark: {
+    backgroundColor: '#1c1917',
+    borderBottomColor: '#292524'
+  },
+  cardDark: {
+    backgroundColor: '#1c1917',
+    borderColor: '#292524'
+  },
+  itemBoxDark: {
+    backgroundColor: '#292524',
+    borderColor: '#3b3533'
+  },
+  textDark: {
+    color: '#fafaf9'
+  },
+  subtextDark: {
+    color: '#a8a29e'
+  },
+  containerDark: {
+    backgroundColor: '#0c0a09'
+  },
+  toggleBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f4',
+    borderWidth: 1,
+    borderColor: '#e7e5e4'
+  },
+  toggleBtnDark: {
+    backgroundColor: '#292524',
+    borderColor: '#3b3533'
+  },
+  toggleBtnText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#1c1917'
+  },
+  toggleBtnTextDark: {
+    color: '#fafaf9'
   }
 });

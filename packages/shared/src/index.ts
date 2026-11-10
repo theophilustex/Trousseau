@@ -57,6 +57,21 @@ export const WearLogStatuses = [
 ] as const;
 export type WearLogStatus = typeof WearLogStatuses[number];
 
+// Temperature helpers
+export type TemperatureUnit = 'C' | 'F';
+
+export function celsiusToFahrenheit(celsius: number): number {
+  return Math.round((celsius * 9) / 5 + 32);
+}
+
+export function formatTemp(tempC: number | null | undefined, unit: TemperatureUnit = 'C'): string {
+  if (tempC === null || tempC === undefined) return '--';
+  if (unit === 'F') {
+    return `${celsiusToFahrenheit(tempC)}°F`;
+  }
+  return `${Math.round(tempC)}°C`;
+}
+
 // Common default wash thresholds
 export const DEFAULT_MAX_WEARS: Record<ClothingCategory, number> = {
   tops: 2,

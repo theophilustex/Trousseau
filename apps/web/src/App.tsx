@@ -35,6 +35,45 @@ export const App: React.FC = () => {
   const [activeSocialOutfit, setActiveSocialOutfit] = useState<Outfit | null>(null);
   const [isBackupOpen, setIsBackupOpen] = useState(false);
 
+  // User & preferences
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('trousseau_theme');
+      if (saved === 'dark' || saved === 'light') return saved;
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+    }
+    return 'light';
+  });
+
+  const [tempUnit, setTempUnit] = useState<import('@trousseau/shared').TemperatureUnit>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('trousseau_temp_unit');
+      if (saved === 'C' || saved === 'F') return saved;
+    }
+    return 'C';
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('trousseau_theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('trousseau_temp_unit', tempUnit);
+  }, [tempUnit]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+  };
+
+  const toggleTempUnit = () => {
+    setTempUnit((prev) => (prev === 'C' ? 'F' : 'C'));
+  };
+
   // Initial session check
   useEffect(() => {
     checkAuth();
@@ -178,8 +217,8 @@ export const App: React.FC = () => {
 
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-stone-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-900" />
+      <div className="min-h-screen flex items-center justify-center bg-stone-50 dark:bg-stone-950 transition-colors">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-900 dark:border-stone-100" />
       </div>
     );
   }
@@ -200,13 +239,17 @@ export const App: React.FC = () => {
   ).length;
 
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col">
+    <div className="min-h-screen bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 flex flex-col transition-colors duration-200">
       <Navbar
         currentTab={currentTab}
         onTabChange={setCurrentTab}
         user={user}
         weather={weather}
         laundryCount={dirtyCount}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        tempUnit={tempUnit}
+        onToggleTempUnit={toggleTempUnit}
         onOpenBackup={() => setIsBackupOpen(true)}
         onLogout={handleLogout}
       />
@@ -218,6 +261,7 @@ export const App: React.FC = () => {
             todayLog={todayLog}
             recommendations={recommendations}
             allOutfits={outfits}
+            tempUnit={tempUnit}
             onConfirmTodayWear={handleConfirmTodayWear}
             onPlanOutfit={handlePlanOutfit}
             onGoToOutfitBuilder={() => setCurrentTab('outfits')}
@@ -228,6 +272,7 @@ export const App: React.FC = () => {
         {currentTab === 'wardrobe' && (
           <WardrobeCatalog
             items={items}
+            tempUnit={tempUnit}
             onAddItem={handleAddItem}
             onDeleteItem={handleDeleteItem}
             onWashItem={handleWashItem}
