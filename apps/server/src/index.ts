@@ -6,6 +6,7 @@ import fastifyStatic from '@fastify/static';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import fs from 'node:fs';
+import { ZodError } from 'zod';
 
 import { storagePaths } from './db/index.js';
 import { runMigrations } from './db/migrate.js';
@@ -26,6 +27,37 @@ runMigrations();
 const server = Fastify({
   logger: process.env.NODE_ENV !== 'test',
   bodyLimit: 50 * 1024 * 1024 // 50MB for backups and photo uploads
+});
+
+// Global Friendly Error Handler
+server.setErrorHandler((error: any, request, reply) => {
+  if (error instanceof ZodError) {
+    const firstIssue = error.issues[0];
+    const field = firstIssue?.path.join('.') || 'input';
+    const message = firstIssue?.message || 'Invalid input';
+    return reply.status(400).send({
+      error: `${field}: ${message}`,
+      details: error.issues
+    });
+  }
+
+  if (error.statusCode && error.statusCode < 500) {
+    return reply.status(error.statusCode).send({ error: error.message });
+  }
+
+  // Handle common business logic errors (e.g. unique constraint, invalid login)
+  if (error.message && (
+    error.message.includes('already exists') ||
+    error.message.includes('Invalid credentials') ||
+    error.message.includes('not found')
+  )) {
+    return reply.status(400).send({ error: error.message });
+  }
+
+  server.log.error(error);
+  return reply.status(error.statusCode || 500).send({
+    error: error.message || 'An unexpected error occurred'
+  });
 });
 
 // CORS support for web and mobile clients

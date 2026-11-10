@@ -131,12 +131,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-stone-700 mb-1">Password</label>
+            <label className="block text-xs font-semibold text-stone-700 mb-1">
+              Password {isRegister && <span className="text-stone-400 font-normal">(min. 8 characters)</span>}
+            </label>
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3 top-3 text-stone-400" />
               <input
                 type="password"
                 required
+                minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
