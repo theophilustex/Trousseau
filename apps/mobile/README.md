@@ -19,7 +19,7 @@ You can build a standalone `.apk` to sideload onto any Android phone or tablet.
 2. Go to the **Actions** tab in your GitHub repository (`https://github.com/<owner>/Trousseau/actions`).
 3. Select the **Build Android APK** workflow and click **Run workflow** (or it triggers automatically on push).
 4. When finished (typically 3–5 minutes), scroll to the **Artifacts** section at the bottom of the run page.
-5. Download **`trousseau-mobile-apk`**, unzip the downloaded file, and install `app-debug.apk` directly on your Android phone!
+5. Download **`trousseau-mobile-apk`**, unzip the downloaded file, and install `app-release.apk` directly on your Android phone!
 
 ### Method 2: Using EAS Build (Cloud)
 ```bash

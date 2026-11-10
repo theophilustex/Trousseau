@@ -52,20 +52,42 @@ jobs:
         working-directory: apps/mobile
         run: npx expo prebuild --platform android --clean --no-install
 
+      - name: Configure standalone release signing
+        working-directory: apps/mobile/android
+        run: |
+          # Configure release build to use debug signing key so APK is standalone and installable
+          sed -i 's/signingConfig signingConfigs.release/signingConfig signingConfigs.debug/g' app/build.gradle || true
+
       - name: Make gradlew executable
         run: chmod +x apps/mobile/android/gradlew
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Android Debug APK
+      - name: Build Android Standalone Release APK
         working-directory: apps/mobile/android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Verify and Sign APK if needed
+        working-directory: apps/mobile/android
+        run: |
+          ls -la app/build/outputs/apk/release/ || true
+          UNSIGNED_APK=$(find app/build/outputs/apk/release -name "*unsigned*.apk" | head -n 1)
+          if [ -n "$UNSIGNED_APK" ]; then
+            echo "Signing $UNSIGNED_APK with debug keystore..."
+            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore app/debug.keystore -storepass android -keypass android "$UNSIGNED_APK" androiddebugkey
+            FINAL_APK="${UNSIGNED_APK/-unsigned/}"
+            mv "$UNSIGNED_APK" "$FINAL_APK"
+            echo "Successfully signed: $FINAL_APK"
+          fi
+          APK_FILE=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "Inspecting $APK_FILE for bundled JS:"
+          unzip -l "$APK_FILE" | grep -E "index\.android\.bundle" || true
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: trousseau-mobile-apk
-          path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
+          path: apps/mobile/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 30
