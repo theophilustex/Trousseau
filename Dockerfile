@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-RUN corepack enable && corepack prepare pnpm@10.2.1 --activate
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Copy manifest files
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
@@ -22,6 +22,10 @@ COPY apps/web/package.json ./apps/web/
 
 # Install all dependencies and compile native addons
 RUN pnpm install --frozen-lockfile
+RUN pnpm rebuild better-sqlite3 sharp
+
+# Sanity check: Ensure better_sqlite3.node was compiled successfully
+RUN ls -la /app/node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3/build/Release/better_sqlite3.node
 
 # Copy source code
 COPY packages/shared ./packages/shared
@@ -35,9 +39,6 @@ RUN pnpm --filter @trousseau/server run build
 
 # Copy web dist into server for self-contained serving
 RUN cp -r apps/web/dist apps/server/web-dist
-
-# Prune devDependencies while preserving compiled native modules
-RUN pnpm prune --prod
 
 # ---------------------------------------------------
 # Stage 2: Production Image
@@ -64,6 +65,9 @@ COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/apps/server/node_modules ./apps/server/node_modules
 COPY --from=builder /app/apps/server/web-dist ./apps/server/web-dist
 COPY --from=builder /app/apps/server/package.json ./apps/server/package.json
+
+# Final sanity check: verify binding exists in runner image
+RUN ls -la /app/node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3/build/Release/better_sqlite3.node
 
 # Create persistent data volume directory
 RUN mkdir -p /app/data/uploads/images /app/data/uploads/thumbnails
