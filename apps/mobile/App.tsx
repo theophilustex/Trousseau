@@ -91,7 +91,7 @@ export default function App() {
     const cleanUrl = activeUrl.replace(/\/+$/, '');
     const activeToken = overrideToken || token;
     const headers = {
-      'Content-Type': 'application/json',
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
       ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
       ...(options.headers || {})
     };

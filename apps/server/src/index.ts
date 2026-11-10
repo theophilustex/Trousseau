@@ -66,6 +66,20 @@ await server.register(cors, {
   credentials: true
 });
 
+// Handle empty JSON bodies gracefully for DELETE and bodyless POST requests (e.g. /wash)
+server.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+  if (!body || (typeof body === 'string' && body.trim() === '')) {
+    done(null, undefined);
+    return;
+  }
+  try {
+    done(null, JSON.parse(body));
+  } catch (err: any) {
+    err.statusCode = 400;
+    done(err, undefined);
+  }
+});
+
 // JWT Authentication
 const JWT_SECRET = process.env.JWT_SECRET || 'trousseau_dev_secret_key_change_in_production';
 await server.register(jwt, {
