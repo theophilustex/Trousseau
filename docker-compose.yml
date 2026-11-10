@@ -1,6 +1,7 @@
 services:
   trousseau:
     image: ghcr.io/theophilustex/trousseau:latest
+    pull_policy: always
     # To build locally from source instead of pulling pre-built image:
     # build:
     #   context: .
