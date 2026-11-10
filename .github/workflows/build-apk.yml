@@ -9,6 +9,10 @@ on:
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -34,8 +38,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
@@ -45,18 +50,17 @@ jobs:
 
       - name: Expo Prebuild Android
         working-directory: apps/mobile
-        run: npx expo prebuild --platform android --clean
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Make gradlew executable
+        run: chmod +x apps/mobile/android/gradlew
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build Android Debug APK
         working-directory: apps/mobile/android
         run: ./gradlew assembleDebug --no-daemon
-
-      - name: Locate Generated APK
-        id: apk-path
-        run: |
-          APK_FILE=$(find apps/mobile/android/app/build/outputs/apk -name "*.apk" | head -n 1)
-          echo "Found APK: $APK_FILE"
-          echo "apk_file=$APK_FILE" >> $GITHUB_OUTPUT
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
